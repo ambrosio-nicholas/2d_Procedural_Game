@@ -1,6 +1,6 @@
 extends CharacterBody2D
 
-const SPEED = 10.0
+const SPEED = 30.0
 
 func _physics_process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_S):
