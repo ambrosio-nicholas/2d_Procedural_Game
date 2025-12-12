@@ -1,8 +1,9 @@
-[gd_scene load_steps=6 format=3 uid="uid://cc3glom6vocls"]
+[gd_scene load_steps=7 format=3 uid="uid://cc3glom6vocls"]
 
 [ext_resource type="Texture2D" uid="uid://d2m6iscm7p6fo" path="res://Assets/TileSheet.png" id="1_02lis"]
 [ext_resource type="Script" uid="uid://d3pgh18kmi5fy" path="res://tile_map_layer.gd" id="2_dj3ax"]
 [ext_resource type="PackedScene" uid="uid://cyvaceevmq66u" path="res://Scripts/mapCharacterController.tscn" id="3_dj3ax"]
+[ext_resource type="PackedScene" uid="uid://dvga4wyjvq2wy" path="res://Scripts/ui.tscn" id="4_58ipm"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_dj3ax"]
 texture = ExtResource("1_02lis")
@@ -30,13 +31,11 @@ sources/2 = SubResource("TileSetAtlasSource_dj3ax")
 [node name="TileMapLayer" type="TileMapLayer" parent="."]
 tile_set = SubResource("TileSet_8bbvj")
 script = ExtResource("2_dj3ax")
-baseFreq = 0.001
-mountainRangeLength = 7
 mountainBlendRadius = 8
-snowHeight = 0.97
-seaLevel = 0.495
 
 [node name="CharacterBody2D" parent="." instance=ExtResource("3_dj3ax")]
 
 [node name="Camera2D" type="Camera2D" parent="CharacterBody2D"]
 zoom = Vector2(0.2, 0.2)
+
+[node name="UI" parent="." instance=ExtResource("4_58ipm")]

@@ -1,0 +1,96 @@
+[gd_scene load_steps=2 format=3 uid="uid://dvga4wyjvq2wy"]
+
+[ext_resource type="Script" uid="uid://3b1852rr2dt7" path="res://Scripts/worldGeneratorUI.gd" id="1_m1v6r"]
+
+[node name="CanvasLayer" type="CanvasLayer"]
+script = ExtResource("1_m1v6r")
+
+[node name="ContinentFreqSlider" type="HSlider" parent="."]
+anchors_preset = -1
+anchor_right = 0.275
+anchor_bottom = 0.025
+offset_left = 24.0
+offset_top = 40.0
+offset_right = 27.199982
+offset_bottom = 39.8
+max_value = 0.005
+step = 0.0
+
+[node name="ContinentFreqLabel" type="Label" parent="."]
+offset_left = 80.0
+offset_top = 16.0
+offset_right = 251.0
+offset_bottom = 39.0
+text = "Continent Frequency: "
+metadata/_edit_use_anchors_ = true
+
+[node name="BaseFreqSlider" type="HSlider" parent="."]
+anchors_preset = -1
+anchor_right = 0.2751736
+anchor_bottom = 0.024691358
+offset_left = 24.0
+offset_top = 88.0
+offset_right = 24.0
+offset_bottom = 88.0
+max_value = 0.05
+step = 0.001
+metadata/_edit_use_anchors_ = true
+
+[node name="BaseFreqLabel" type="Label" parent="."]
+offset_left = 80.0
+offset_top = 64.0
+offset_right = 251.0
+offset_bottom = 87.0
+text = "Base Frequency: "
+metadata/_edit_use_anchors_ = true
+
+[node name="DetailFreqSlider" type="HSlider" parent="."]
+anchors_preset = -1
+anchor_right = 0.2751736
+anchor_bottom = 0.024691358
+offset_left = 24.0
+offset_top = 136.0
+offset_right = 24.0
+offset_bottom = 136.0
+max_value = 0.05
+step = 0.001
+metadata/_edit_use_anchors_ = true
+
+[node name="DetailFreqLabel" type="Label" parent="."]
+offset_left = 80.0
+offset_top = 112.0
+offset_right = 251.0
+offset_bottom = 135.0
+text = "Detail Frequency: "
+metadata/_edit_use_anchors_ = true
+
+[node name="SeaVsLandSlider" type="HSlider" parent="."]
+anchors_preset = -1
+anchor_right = 0.2751736
+anchor_bottom = 0.024691358
+offset_left = 24.0
+offset_top = 184.0
+offset_right = 24.0
+offset_bottom = 184.0
+max_value = 1.0
+step = 0.05
+metadata/_edit_use_anchors_ = true
+
+[node name="SeaVsLandLabel" type="Label" parent="."]
+offset_left = 80.0
+offset_top = 160.0
+offset_right = 251.0
+offset_bottom = 183.0
+text = "Sea to Land Ratio: "
+metadata/_edit_use_anchors_ = true
+
+[node name="NewWorldButton" type="Button" parent="."]
+anchors_preset = -1
+anchor_right = 0.007
+anchor_bottom = 0.012
+offset_left = 80.0
+offset_top = 224.0
+offset_right = 207.936
+offset_bottom = 248.224
+text = "New World
+(R)"

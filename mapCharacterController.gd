@@ -5,7 +5,7 @@ var SPEED = 30.0
 var maxZoom = 2
 var minZoom = 0.01
 var currentZoom = 0.2
-@onready var camera: Camera2D = get_node("Camera2D")
+@onready var camera : Camera2D = get_node("Camera2D")
 
 func _physics_process(delta: float) -> void:
 	getMovement()
