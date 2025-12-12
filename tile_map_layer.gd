@@ -20,6 +20,8 @@ var mountains : Array[Vector2i] = [] # Contains the Coords for each mountain pea
 @export var mountainRangeLength : int = (mapSizeX * mapSizeY) / 40000 # Determines how many mountains will be in a mountain range (Determined by mapSize)
 @export var mountainBlendRadius : int = 4 # Determines how far the mountains should take to blend into the surrounding terrain
 
+@export var numOfRivers : int = 6
+
 var seaLevel : float # Determined in generateBase(), and used to determine other the levels
 var shoreLevel : float
 var plainsLevel : float
@@ -40,16 +42,17 @@ var detailNoise = FastNoiseLite.new()
 func _process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_R):
 		reseedWorld()
-		regenerateWorld()
+		generateWorld()
 	pass
 
+# This function will randomize the world and the points within
 func reseedWorld() -> void:
 	# randomize the noise layers
 	baseNoise.seed = randi()
 	detailNoise.seed = randi()
 	continentNoise.seed = randi()
 
-func regenerateWorld() -> void:
+func generateWorld() -> void:
 	# clear away any old world and prep for a new one
 	tile_map_data.clear()
 	mountains.clear()
@@ -58,7 +61,8 @@ func regenerateWorld() -> void:
 	
 	# generate the different parts of the world before combining it all together
 	generateBase()
-	#generateMountains()q
+	generateRivers()
+	#generateMountains()
 	#blendMountains(mountainBlendRadius)
 	
 	# set the tiles to draw the world following all rules
@@ -159,7 +163,8 @@ func generateMountains() -> void:
 			heightMap[(x * mapSizeY) + y] = mountainHeight
 			mountains.push_front(Vector2i(x,y))
 
-func blendMountains(radius := 2):
+func blendMountains():
+	var radius = 2
 	for m in mountains:
 		var mx = m.x
 		var my = m.y
@@ -180,6 +185,46 @@ func blendMountains(radius := 2):
 				var weight = pow(max(0, 1 - ((dist - 1) / (radius - 1))), 2)  # quadratic falloff
 				#var weight = max(0, 1 - ((dist - 1) / (radius - 1)))  # weight decreases with distance
 				heightMap[index] = lerp(heightMap[index], mountainHeight, weight)
+
+func generateRivers() -> void:
+	var riverTiles : Array[Vector2i] = []
+	# Create as many rivers as specified
+	for i in range(numOfRivers):
+		var x = null
+		var y = null
+		# Generate possible sources until it's in a preferable spot (Altitude based)
+		for attempts in 100:
+			x = (randi() % mapSizeX)
+			y = (randi() % mapSizeY)
+			if (heightMap[(y*mapSizeX) + x] <= lowMountainLevel) && (heightMap[(y*mapSizeX) + x] >= foothillsLevel):
+				break
+		var lowestPoint = heightMap[(y*mapSizeX) + x]
+		riverTiles.push_front(Vector2i(x,y))
+		var newX = null
+		var newY = null
+		# Now find the closest neighbor in the 4 cardinal directions and choose the lowest altitude, then rinse and repeat until we hiot another river or the sea
+		while true:
+			if (y > 0) && (heightMap[((y-1)*mapSizeX) + x] < lowestPoint): # Check the tile above
+				newX = x
+				newY = y - 1
+			if (y < (mapSizeY - 1)) && (heightMap[((y+1)*mapSizeX) + x] < lowestPoint): # Check the tile below
+				newX = x
+				newY = y + 1
+			if (x < (mapSizeX - 1)) && (heightMap[(y*mapSizeX) + x + 1] < lowestPoint): # Check the tile to the right
+				newX = x + 1
+				newY = y
+			if (x > 0) && (heightMap[(y*mapSizeX) + x - 1] < lowestPoint): # Check the tile to the left
+				newX = x - 1
+				newY = y 
+			if newX == x && newY == y: # Check that we've haven't gotten to the lowest point
+				break
+			# Assign the new lowest point once we've checked all surrounding tiles
+			lowestPoint = heightMap[(newY*mapSizeX) + newX]
+			x = newX
+			y = newY
+			riverTiles.push_front(Vector2i(x,y))
+	for i in riverTiles.size():
+		heightMap[(riverTiles[i].y*mapSizeX) + riverTiles[i].x] = seaLevel - 0.01
 
 func determineAndDrawTileType(x,y) -> void:
 	if heightMap[(y * mapSizeX) + x] >= highMountainLevel:

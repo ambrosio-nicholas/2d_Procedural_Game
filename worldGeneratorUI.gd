@@ -49,10 +49,10 @@ func _process(delta: float) -> void:
 	
 	# If any value changed, regenerate the world
 	if needsToUpdate == true:
-		worldGenerator.regenerateWorld()
+		worldGenerator.generateWorld()
 		needsToUpdate = false
 	
 	# If the new world button is pressed, randomize the seed and regenerate
 	if newWorldButton.button_pressed:
 		worldGenerator.reseedWorld()
-		worldGenerator.regenerateWorld()
+		worldGenerator.generateWorld()
