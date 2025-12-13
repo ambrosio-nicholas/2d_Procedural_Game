@@ -61,7 +61,6 @@ func generateWorld() -> void:
 	
 	# generate the different parts of the world before combining it all together
 	generateBase()
-	generateRivers()
 	#generateMountains()
 	#blendMountains(mountainBlendRadius)
 	
@@ -70,6 +69,7 @@ func generateWorld() -> void:
 		for x in range(mapSizeX):
 			# for each square
 			determineAndDrawTileType(x,y)
+	generateRivers()
 
 func generateBase() -> void:
 	# Continent Noise
@@ -187,44 +187,66 @@ func blendMountains():
 				heightMap[index] = lerp(heightMap[index], mountainHeight, weight)
 
 func generateRivers() -> void:
-	var riverTiles : Array[Vector2i] = []
-	# Create as many rivers as specified
-	for i in range(numOfRivers):
-		var x = null
-		var y = null
-		# Generate possible sources until it's in a preferable spot (Altitude based)
+	# Choose a valid point on the map (Criteria: Altitude)
+	var source = null
+	var nextTile = null
+	var lastTile = null
+	var lowestHeight = INF
+	var previousHeight = null
+	var timesFilled = 0 # This bool will help figure out if a river gets stuck and has started making a lake
+	for i in numOfRivers:
+		timesFilled = 0
 		for attempts in 100:
-			x = (randi() % mapSizeX)
-			y = (randi() % mapSizeY)
-			if (heightMap[(y*mapSizeX) + x] <= lowMountainLevel) && (heightMap[(y*mapSizeX) + x] >= foothillsLevel):
+			source = Vector2i(randi() % mapSizeX, randi() % mapSizeY)
+			if (heightMap[(source.y * mapSizeX) + source.x] > lowMountainLevel) && (heightMap[(source.y * mapSizeX) + source.x] < mediumMountainLevel):
 				break
-		var lowestPoint = heightMap[(y*mapSizeX) + x]
-		riverTiles.push_front(Vector2i(x,y))
-		var newX = null
-		var newY = null
-		# Now find the closest neighbor in the 4 cardinal directions and choose the lowest altitude, then rinse and repeat until we hiot another river or the sea
-		while true:
-			if (y > 0) && (heightMap[((y-1)*mapSizeX) + x] < lowestPoint): # Check the tile above
-				newX = x
-				newY = y - 1
-			if (y < (mapSizeY - 1)) && (heightMap[((y+1)*mapSizeX) + x] < lowestPoint): # Check the tile below
-				newX = x
-				newY = y + 1
-			if (x < (mapSizeX - 1)) && (heightMap[(y*mapSizeX) + x + 1] < lowestPoint): # Check the tile to the right
-				newX = x + 1
-				newY = y
-			if (x > 0) && (heightMap[(y*mapSizeX) + x - 1] < lowestPoint): # Check the tile to the left
-				newX = x - 1
-				newY = y 
-			if newX == x && newY == y: # Check that we've haven't gotten to the lowest point
+		lowestHeight = heightMap[(source.y * mapSizeX) + source.x]
+		previousHeight = null
+		lastTile = source
+		set_cell(source, 2, Vector2i(12,0))
+		
+		# Now that we have a source, flow the river downhill until it hits water. We check the surrounding tiles for a lower altitude
+		while (lowestHeight > seaLevel) && (source.x > 0) && (source.x < mapSizeX - 1) && (source.y > 0) && (source.y < mapSizeY - 1):# && (get_cell_atlas_coords(source) != Vector2i(2,0)):
+			previousHeight = lowestHeight
+			if source.y > 0:
+				if (Vector2i(source.x, source.y - 1) != lastTile) && (heightMap[((source.y - 1) * mapSizeX) + source.x] <= lowestHeight): # Up
+					nextTile = Vector2i(source.x, source.y - 1)
+			if source.y < mapSizeY - 1:
+				if (Vector2i(source.x, source.y + 1) != lastTile) && (heightMap[((source.y + 1) * mapSizeX) + source.x] <= lowestHeight): # Down
+					nextTile = Vector2i(source.x, source.y + 1)
+			if source.x < mapSizeX - 1:
+				if (Vector2i(source.x + 1, source.y) != lastTile) && (heightMap[(source.y * mapSizeX) + source.x + 1] <= lowestHeight): # Right
+					nextTile = Vector2i(source.x + 1, source.y)
+			if source.x > 0:
+				if (Vector2i(source.x - 1, source.y) != lastTile) && (heightMap[(source.y * mapSizeX) + source.x - 1] <= lowestHeight): # Left
+					nextTile = Vector2i(source.x - 1, source.y)
+			if source.x > 0 and source.y > 0:
+				if (Vector2i(source.x - 1, source.y - 1) != lastTile) && (heightMap[((source.y - 1) * mapSizeX) + source.x - 1] <= lowestHeight): # Up-Left
+					nextTile = Vector2i(source.x - 1, source.y - 1)
+			if source.x < mapSizeX - 1 and source.y > 0:
+				if (Vector2i(source.x + 1, source.y - 1) != lastTile) && (heightMap[((source.y - 1) * mapSizeX) + source.x + 1] <= lowestHeight): # Up-Right
+					nextTile = Vector2i(source.x + 1, source.y - 1)
+			if source.x > 0 and source.y < mapSizeY - 1:
+				if (Vector2i(source.x - 1, source.y + 1) != lastTile) && (heightMap[((source.y + 1) * mapSizeX) + source.x - 1] <= lowestHeight): # Down-Left
+					nextTile = Vector2i(source.x - 1, source.y + 1)
+			if source.x < mapSizeX - 1 and source.y < mapSizeY - 1:
+				if (Vector2i(source.x + 1, source.y + 1) != lastTile) && (heightMap[((source.y + 1) * mapSizeX) + source.x + 1] <= lowestHeight): # Down-Right
+					nextTile = Vector2i(source.x + 1, source.y + 1)
+			
+			# Now if one of the tiles was lower, we can make it our new reference point for the next point and if none were, we can give the river a "boost"
+			if (heightMap[((source.y) * mapSizeX) + source.x] == heightMap[((lastTile.y) * mapSizeX) + lastTile.x]) && (timesFilled < 5):
+				heightMap[((source.y) * mapSizeX) + source.x] = clamp(heightMap[((source.y) * mapSizeX) + source.x] + .05,  0, lowMountainLevel)
+				timesFilled += 1
+			elif (heightMap[((source.y) * mapSizeX) + source.x] == heightMap[((lastTile.y) * mapSizeX) + lastTile.x]) && (timesFilled >= 5):
 				break
-			# Assign the new lowest point once we've checked all surrounding tiles
-			lowestPoint = heightMap[(newY*mapSizeX) + newX]
-			x = newX
-			y = newY
-			riverTiles.push_front(Vector2i(x,y))
-	for i in riverTiles.size():
-		heightMap[(riverTiles[i].y*mapSizeX) + riverTiles[i].x] = seaLevel - 0.01
+			else:
+				timesFilled = 0
+			lastTile = source
+			source = nextTile
+			lowestHeight = heightMap[(source.y * mapSizeX) + source.x]
+			set_cell(source, 2, Vector2i(2,0))
+			set_cell(Vector2i(source.x,source.y-1), 2, Vector2i(2,0))
+			#set_cell(Vector2i(source.x-1,source.y), 2, Vector2i(2,0))
 
 func determineAndDrawTileType(x,y) -> void:
 	if heightMap[(y * mapSizeX) + x] >= highMountainLevel:
