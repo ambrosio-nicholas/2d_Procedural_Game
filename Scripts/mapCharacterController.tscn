@@ -1,7 +1,7 @@
 [gd_scene load_steps=4 format=3 uid="uid://cyvaceevmq66u"]
 
 [ext_resource type="Script" uid="uid://ot8cb7dvykg7" path="res://mapCharacterController.gd" id="1_gvjti"]
-[ext_resource type="Texture2D" uid="uid://bydkcnl6hci8s" path="res://icon.svg" id="2_oucmu"]
+[ext_resource type="Texture2D" uid="uid://c15lbn5yfta1v" path="res://Assets/Cursor.png" id="2_gvjti"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_pa054"]
 size = Vector2(129, 130)
@@ -10,8 +10,10 @@ size = Vector2(129, 130)
 script = ExtResource("1_gvjti")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-position = Vector2(-0.5, 0)
+position = Vector2(16, 16)
+scale = Vector2(0.25, 0.25)
 shape = SubResource("RectangleShape2D_pa054")
 
 [node name="Sprite2D" type="Sprite2D" parent="."]
-texture = ExtResource("2_oucmu")
+position = Vector2(32, 32)
+texture = ExtResource("2_gvjti")

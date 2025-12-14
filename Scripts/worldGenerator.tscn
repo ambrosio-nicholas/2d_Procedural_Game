@@ -33,6 +33,7 @@ tile_set = SubResource("TileSet_8bbvj")
 script = ExtResource("2_dj3ax")
 
 [node name="CharacterBody2D" parent="." instance=ExtResource("3_dj3ax")]
+position = Vector2(32, 32)
 
 [node name="Camera2D" type="Camera2D" parent="CharacterBody2D"]
 zoom = Vector2(0.2, 0.2)

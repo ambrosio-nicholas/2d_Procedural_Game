@@ -104,18 +104,4 @@ offset_top = -40.0
 offset_right = 195.0
 offset_bottom = -17.0
 grow_vertical = 0
-text = "Tile:"
-
-[node name="Controls" type="Label" parent="."]
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 24.0
-offset_top = -144.0
-offset_right = 274.0
-offset_bottom = -43.0
-grow_vertical = 0
-text = "Controls:
-- WASD for smooth movement
-- Arrow Keys for fine movement
-- Hold Shift for faster movement"
+text = "Sea to Land Ratio: "

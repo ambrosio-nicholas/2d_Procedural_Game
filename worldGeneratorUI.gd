@@ -10,9 +10,15 @@ extends CanvasLayer
 @onready var seaVsLandSlider : HSlider = $SeaVsLandSlider
 @onready var seaVsLandText : Label = $SeaVsLandLabel
 @onready var newWorldButton : Button = $NewWorldButton
+@onready var tileInfoLabel : Label = $TileInfoLabel
 
 # world generator script
 @onready var worldGenerator : TileMapLayer = get_node("../TileMapLayer")
+@onready var mapSizeX = worldGenerator.mapSizeX
+@onready var mapSizeY = worldGenerator.mapSizeY
+# player
+@onready var player : CharacterBody2D = get_node("../CharacterBody2D")
+var playerCoords : Vector2i = Vector2i(0,0)
 
 var needsToUpdate : bool = false
 
@@ -56,3 +62,10 @@ func _process(delta: float) -> void:
 	if newWorldButton.button_pressed:
 		worldGenerator.reseedWorld()
 		worldGenerator.generateWorld()
+	
+	# Display the coords and altitude of the tile the player is currently over
+	playerCoords = Vector2i(roundi((player.position.x) / 32), roundi((player.position.y) / 32))
+	if worldGenerator.heightMap.size() == 0:
+		tileInfoLabel.text = "Tile: N/A"
+	else:
+		tileInfoLabel.text = str("Tile: ", playerCoords, " - Altitude: ", worldGenerator.heightMap[(playerCoords.y * mapSizeX) + playerCoords.x])

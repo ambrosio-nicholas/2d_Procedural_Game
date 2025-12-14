@@ -192,60 +192,117 @@ func generateRivers() -> void:
 	var nextTile = null
 	var lastTile = null
 	var lowestHeight = INF
-	var previousHeight = null
-	var timesFilled = 0 # This bool will help figure out if a river gets stuck and has started making a lake
+	var secondLowestTile = null
+	var secondLowestHeight = INF
 	for i in numOfRivers:
-		timesFilled = 0
 		for attempts in 100:
 			source = Vector2i(randi() % mapSizeX, randi() % mapSizeY)
 			if (heightMap[(source.y * mapSizeX) + source.x] > lowMountainLevel) && (heightMap[(source.y * mapSizeX) + source.x] < mediumMountainLevel):
 				break
 		lowestHeight = heightMap[(source.y * mapSizeX) + source.x]
-		previousHeight = null
+		secondLowestTile = source
 		lastTile = source
 		set_cell(source, 2, Vector2i(12,0))
 		
 		# Now that we have a source, flow the river downhill until it hits water. We check the surrounding tiles for a lower altitude
-		while (lowestHeight > seaLevel) && (source.x > 0) && (source.x < mapSizeX - 1) && (source.y > 0) && (source.y < mapSizeY - 1):# && (get_cell_atlas_coords(source) != Vector2i(2,0)):
-			previousHeight = lowestHeight
+		while (lowestHeight > seaLevel) && (source.x > 0) && (source.x < mapSizeX - 1) && (source.y > 0) && (source.y < mapSizeY - 1):
+			# Check Up
 			if source.y > 0:
-				if (Vector2i(source.x, source.y - 1) != lastTile) && (heightMap[((source.y - 1) * mapSizeX) + source.x] <= lowestHeight): # Up
-					nextTile = Vector2i(source.x, source.y - 1)
+				if Vector2i(source.x, source.y - 1) != lastTile:
+					if heightMap[((source.y - 1) * mapSizeX) + source.x] < lowestHeight:
+						nextTile = Vector2i(source.x, source.y - 1)
+						lowestHeight = heightMap[((source.y - 1) * mapSizeX) + source.x]
+					elif (heightMap[((source.y - 1) * mapSizeX) + source.x] > lowestHeight) && (heightMap[((source.y - 1) * mapSizeX) + source.x] < secondLowestHeight):
+						secondLowestTile = Vector2i(source.x, source.y - 1)
+						secondLowestHeight = heightMap[((secondLowestTile.y) * mapSizeX) + secondLowestTile.x]
+			# Check Down
 			if source.y < mapSizeY - 1:
-				if (Vector2i(source.x, source.y + 1) != lastTile) && (heightMap[((source.y + 1) * mapSizeX) + source.x] <= lowestHeight): # Down
-					nextTile = Vector2i(source.x, source.y + 1)
+				if Vector2i(source.x, source.y + 1) != lastTile:
+					if heightMap[((source.y + 1) * mapSizeX) + source.x] < lowestHeight:
+						nextTile = Vector2i(source.x, source.y + 1)
+						lowestHeight = heightMap[((source.y + 1) * mapSizeX) + source.x]
+					elif (heightMap[((source.y + 1) * mapSizeX) + source.x] > lowestHeight) && (heightMap[((source.y + 1) * mapSizeX) + source.x] < secondLowestHeight):
+						secondLowestTile = Vector2i(source.x, source.y + 1)
+						secondLowestHeight = heightMap[((secondLowestTile.y) * mapSizeX) + secondLowestTile.x]
+			# Check Right
 			if source.x < mapSizeX - 1:
-				if (Vector2i(source.x + 1, source.y) != lastTile) && (heightMap[(source.y * mapSizeX) + source.x + 1] <= lowestHeight): # Right
-					nextTile = Vector2i(source.x + 1, source.y)
+				if Vector2i(source.x + 1, source.y) != lastTile:
+					if heightMap[(source.y * mapSizeX) + source.x + 1] < lowestHeight:
+						nextTile = Vector2i(source.x + 1, source.y)
+						lowestHeight = heightMap[(source.y * mapSizeX) + source.x + 1]
+					elif (heightMap[(source.y * mapSizeX) + source.x + 1] > lowestHeight) && (heightMap[(source.y * mapSizeX) + source.x + 1] < secondLowestHeight):
+						secondLowestTile = Vector2i(source.x + 1, source.y)
+						secondLowestHeight = heightMap[((secondLowestTile.y) * mapSizeX) + secondLowestTile.x]
+			# Check Left
 			if source.x > 0:
-				if (Vector2i(source.x - 1, source.y) != lastTile) && (heightMap[(source.y * mapSizeX) + source.x - 1] <= lowestHeight): # Left
-					nextTile = Vector2i(source.x - 1, source.y)
-			if source.x > 0 and source.y > 0:
-				if (Vector2i(source.x - 1, source.y - 1) != lastTile) && (heightMap[((source.y - 1) * mapSizeX) + source.x - 1] <= lowestHeight): # Up-Left
-					nextTile = Vector2i(source.x - 1, source.y - 1)
-			if source.x < mapSizeX - 1 and source.y > 0:
-				if (Vector2i(source.x + 1, source.y - 1) != lastTile) && (heightMap[((source.y - 1) * mapSizeX) + source.x + 1] <= lowestHeight): # Up-Right
-					nextTile = Vector2i(source.x + 1, source.y - 1)
-			if source.x > 0 and source.y < mapSizeY - 1:
-				if (Vector2i(source.x - 1, source.y + 1) != lastTile) && (heightMap[((source.y + 1) * mapSizeX) + source.x - 1] <= lowestHeight): # Down-Left
-					nextTile = Vector2i(source.x - 1, source.y + 1)
-			if source.x < mapSizeX - 1 and source.y < mapSizeY - 1:
-				if (Vector2i(source.x + 1, source.y + 1) != lastTile) && (heightMap[((source.y + 1) * mapSizeX) + source.x + 1] <= lowestHeight): # Down-Right
-					nextTile = Vector2i(source.x + 1, source.y + 1)
+				if Vector2i(source.x - 1, source.y) != lastTile:
+					if heightMap[(source.y * mapSizeX) + source.x - 1] < lowestHeight:
+						nextTile = Vector2i(source.x - 1, source.y)
+						lowestHeight = heightMap[(source.y * mapSizeX) + source.x - 1]
+					elif (heightMap[(source.y * mapSizeX) + source.x - 1] > lowestHeight) && (heightMap[(source.y * mapSizeX) + source.x - 1] < secondLowestHeight):
+						secondLowestTile = Vector2i(source.x - 1, source.y)
+						secondLowestHeight = heightMap[((secondLowestTile.y) * mapSizeX) + secondLowestTile.x]
+			# Check Up-Left
+			if source.x > 0 && source.y > 0:
+				if Vector2i(source.x - 1, source.y - 1) != lastTile:
+					if heightMap[((source.y - 1) * mapSizeX) + source.x - 1] < lowestHeight:
+						nextTile = Vector2i(source.x - 1, source.y - 1)
+						lowestHeight = heightMap[((source.y - 1) * mapSizeX) + source.x - 1]
+					elif (heightMap[((source.y - 1) * mapSizeX) + source.x - 1] > lowestHeight) && (heightMap[((source.y - 1) * mapSizeX) + source.x - 1] < secondLowestHeight):
+						secondLowestTile = Vector2i(source.x - 1, source.y - 1)
+						secondLowestHeight = heightMap[((secondLowestTile.y) * mapSizeX) + secondLowestTile.x]
+			# Check Up-Right
+			if source.x < mapSizeX - 1 && source.y > 0:
+				if Vector2i(source.x + 1, source.y - 1) != lastTile:
+					if heightMap[((source.y - 1) * mapSizeX) + source.x + 1] < lowestHeight:
+						nextTile = Vector2i(source.x + 1, source.y - 1)
+						lowestHeight = heightMap[((source.y - 1) * mapSizeX) + source.x + 1]
+					elif (heightMap[((source.y - 1) * mapSizeX) + source.x + 1] > lowestHeight) && (heightMap[((source.y - 1) * mapSizeX) + source.x + 1] < secondLowestHeight):
+						secondLowestTile = Vector2i(source.x + 1, source.y - 1)
+						secondLowestHeight = heightMap[((secondLowestTile.y) * mapSizeX) + secondLowestTile.x]
+			#Check Down-Left
+			if source.x > 0 && source.y < mapSizeY - 1:
+				if Vector2i(source.x - 1, source.y + 1) != lastTile:
+					if heightMap[((source.y + 1) * mapSizeX) + source.x - 1] < lowestHeight:
+						nextTile = Vector2i(source.x - 1, source.y + 1)
+						lowestHeight = heightMap[((source.y + 1) * mapSizeX) + source.x - 1]
+					elif (heightMap[((source.y + 1) * mapSizeX) + source.x - 1] > lowestHeight) && (heightMap[((source.y + 1) * mapSizeX) + source.x - 1] < secondLowestHeight):
+						secondLowestTile = Vector2i(source.x - 1, source.y + 1)
+						secondLowestHeight = heightMap[((secondLowestTile.y) * mapSizeX) + secondLowestTile.x]
+			# Check Down-Right
+			if source.x < mapSizeX - 1 && source.y < mapSizeY - 1:
+				if Vector2i(source.x + 1, source.y + 1) != lastTile:
+					if heightMap[((source.y + 1) * mapSizeX) + source.x + 1] < lowestHeight:
+						nextTile = Vector2i(source.x + 1, source.y + 1)
+						lowestHeight = heightMap[((source.y + 1) * mapSizeX) + source.x + 1]
+					elif (heightMap[((source.y + 1) * mapSizeX) + source.x + 1] > lowestHeight) && (heightMap[((source.y + 1) * mapSizeX) + source.x + 1] < secondLowestHeight):
+						secondLowestTile = Vector2i(source.x + 1, source.y + 1)
+						secondLowestHeight = heightMap[((secondLowestTile.y) * mapSizeX) + secondLowestTile.x]
 			
-			# Now if one of the tiles was lower, we can make it our new reference point for the next point and if none were, we can give the river a "boost"
-			if (heightMap[((source.y) * mapSizeX) + source.x] == heightMap[((lastTile.y) * mapSizeX) + lastTile.x]) && (timesFilled < 5):
-				heightMap[((source.y) * mapSizeX) + source.x] = clamp(heightMap[((source.y) * mapSizeX) + source.x] + .05,  0, lowMountainLevel)
-				timesFilled += 1
-			elif (heightMap[((source.y) * mapSizeX) + source.x] == heightMap[((lastTile.y) * mapSizeX) + lastTile.x]) && (timesFilled >= 5):
+			# If we've reached a dead end, add some altitude and restart from the top of the loop (FOR SOME REASON THE RIVERS STILL END UP IN DEAD ENDS. PROBABLY HAS TO DO WITH THE RIVER MERGING CODE. KEEP RIVER FROM MERGING WITH ITSELF)
+			if nextTile == source:
+				heightMap[(source.y * mapSizeX) + source.x] = secondLowestHeight + .01
+				print(source)
+				nextTile = null
+				lowestHeight = INF
+				secondLowestHeight = INF
+				continue
+				
+			# If we've hit water, stop making the river, we're done!
+			if get_cell_atlas_coords(nextTile) == Vector2i(2,0):
+				print("Merged!")
 				break
-			else:
-				timesFilled = 0
+			
+			# Set variables before starting the loop again
 			lastTile = source
 			source = nextTile
 			lowestHeight = heightMap[(source.y * mapSizeX) + source.x]
+			secondLowestHeight = lowestHeight
+			secondLowestTile = source
+			
+			# Make the river tile actually water
 			set_cell(source, 2, Vector2i(2,0))
-			set_cell(Vector2i(source.x,source.y-1), 2, Vector2i(2,0))
+			#set_cell(Vector2i(source.x,source.y-1), 2, Vector2i(2,0))
 			#set_cell(Vector2i(source.x-1,source.y), 2, Vector2i(2,0))
 
 func determineAndDrawTileType(x,y) -> void:
