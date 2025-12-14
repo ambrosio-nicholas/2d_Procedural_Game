@@ -68,4 +68,4 @@ func _process(delta: float) -> void:
 	if worldGenerator.heightMap.size() == 0:
 		tileInfoLabel.text = "Tile: N/A"
 	else:
-		tileInfoLabel.text = str("Tile: ", playerCoords, " - Altitude: ", worldGenerator.heightMap[(playerCoords.y * mapSizeX) + playerCoords.x])
+		tileInfoLabel.text = str("Tile: ", playerCoords, " | Altitude: ", worldGenerator.heightMap[(playerCoords.y * mapSizeX) + playerCoords.x])

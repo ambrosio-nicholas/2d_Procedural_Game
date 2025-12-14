@@ -20,8 +20,6 @@ func _physics_process(delta: float) -> void:
 	getCameraZoom()
 
 func getMovement() -> void:
-	if Input.is_key_pressed(KEY_CTRL):
-		SPEED = 32
 	if Input.is_key_pressed(KEY_SHIFT):
 		SPEED = 128
 	else:
@@ -35,6 +33,7 @@ func getMovement() -> void:
 		position.x = clamp(position.x + SPEED, 0, (mapSizeX * 32) - 32)
 	if Input.is_action_just_pressed("ui_left"):
 		position.x = clamp(position.x - SPEED, 0, (mapSizeX * 32) - 32)
+		
 	# Quick movement with WASD
 	if Input.is_key_pressed(KEY_S):
 		position.y = clamp(position.y + SPEED, 0, (mapSizeY * 32) - 32)
