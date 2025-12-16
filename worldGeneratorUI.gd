@@ -11,6 +11,8 @@ extends CanvasLayer
 @onready var seaVsLandText : Label = $SeaVsLandLabel
 @onready var newWorldButton : Button = $NewWorldButton
 @onready var tileInfoLabel : Label = $TileInfoLabel
+@onready var detailScaleLabel : Label = $DetailScaleLabel
+@onready var detailScaleSlider : HSlider = $DetailScaleSlider
 
 # world generator script
 @onready var worldGenerator : TileMapLayer = get_node("../TileMapLayer")
@@ -30,6 +32,7 @@ func _ready() -> void:
 	baseSlider.value = worldGenerator.baseFreq
 	detailSlider.value = worldGenerator.detailFreq
 	seaVsLandSlider.value = worldGenerator.seaToLandRatio
+	detailScaleSlider.value = worldGenerator.detailScale
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
@@ -38,6 +41,7 @@ func _process(delta: float) -> void:
 	baseFreqText.text = str("Base Freq: ", baseSlider.value)
 	detailFreqText.text = str("Detail Freq: ", detailSlider.value)
 	seaVsLandText.text = str("Sea to Land Ratio: ", seaVsLandSlider.value)
+	detailScaleLabel.text = str("Scale Multiplier: ", detailScaleSlider.value)
 	
 	# If the value has changed, udpate it with the new value
 	if worldGenerator.continentFreq != continentSlider.value:
@@ -51,6 +55,9 @@ func _process(delta: float) -> void:
 		needsToUpdate = true
 	if worldGenerator.seaToLandRatio != seaVsLandSlider.value:
 		worldGenerator.seaToLandRatio = seaVsLandSlider.value
+		needsToUpdate = true
+	if worldGenerator.detailScale != detailScaleSlider.value:
+		worldGenerator.detailScale = detailScaleSlider.value
 		needsToUpdate = true
 	
 	# If any value changed, regenerate the world
@@ -68,4 +75,4 @@ func _process(delta: float) -> void:
 	if worldGenerator.heightMap.size() == 0:
 		tileInfoLabel.text = "Tile: N/A"
 	else:
-		tileInfoLabel.text = str("Tile: ", playerCoords, " | Altitude: ", worldGenerator.heightMap[(playerCoords.y * mapSizeX) + playerCoords.x])
+		tileInfoLabel.text = str("Tile: ", playerCoords, " | Altitude: ", worldGenerator.heightMap[(playerCoords.y * mapSizeX) + playerCoords.x], " | Avg Temp: ", worldGenerator.tempMap[(playerCoords.y * mapSizeX) + playerCoords.x], " | Avg Humidity: ", worldGenerator.moistMap[(playerCoords.y * mapSizeX) + playerCoords.x])

@@ -4,15 +4,19 @@ extends TileMapLayer
 @export var mapSizeY : int = 400
 
 var heightMap : Array[float] = [] # Contains the altitude for each tile indexed in order
-var mountains : Array[Vector2i] = [] # Contains the Coords for each mountain peak
+var tempMap : Array[float] = [] # Contains the Average temperature for each tile
+var moistMap : Array[float] = [] # Contains the Average moisture for each tile
 
 #-----------------Terrain Parameters-----------------
 @export var continentFreq : float = 0.0012
 @export var baseFreq : float = 0.005
-@export var detailFreq: float = 0.01
+@export var detailFreq: float = 0.007
+@export var tempFreq : float = 0.002
+
+@export var detailScale : float = 2.00 # This changes the distance between samples in the noise
 
 @export var mountainHeight : float = 1 # Determines the altitude of mountain peaks. Useful when determining tiles
-@export var seaToLandRatio : float = 0.3 # Determines how much of the world should bd water
+@export var seaToLandRatio : float = 0.35 # Determines how much of the world should be water
 
 var numOfRivers : int = 6
 var maxLakeSize : int = 600
@@ -31,8 +35,8 @@ var mountainPeakLevel : float # Anything above the previous heights.
 var continentNoise = FastNoiseLite.new()
 var baseNoise = FastNoiseLite.new()
 var detailNoise = FastNoiseLite.new()
-# var humidityNoise = FastNoiseLite.new()
-# var temperatureNoise = FastNoiseLite.new()
+var moistureNoise = FastNoiseLite.new()
+var temperatureNoise = FastNoiseLite.new()
 
 func _process(delta: float) -> void:
 	if Input.is_key_pressed(KEY_R):
@@ -46,16 +50,25 @@ func reseedWorld() -> void:
 	baseNoise.seed = randi()
 	detailNoise.seed = randi()
 	continentNoise.seed = randi()
+	temperatureNoise.seed = randi()
+	moistureNoise.seed = randi()
 
 func generateWorld() -> void:
 	# clear away any old world and prep for a new one
 	tile_map_data.clear()
-	mountains.clear()
 	heightMap.clear()
 	heightMap.resize(mapSizeX * mapSizeY)
+	tempMap.clear()
+	tempMap.resize(mapSizeX * mapSizeY)
+	moistMap.clear()
+	moistMap.resize(mapSizeX * mapSizeY)
 	
 	# generate the base part of the world
 	generateBase()
+	
+	generateTemperature()
+	
+	generateMoisture()
 	
 	# set the tiles to draw the world following all rules
 	for y in range(mapSizeY):
@@ -90,9 +103,9 @@ func generateBase() -> void:
 		for x in range(mapSizeX):
 			var idx := x * mapSizeY + y
 			# Get values
-			var c = continentNoise.get_noise_2d(x, y)   # -1 .. 1
-			var b = baseNoise.get_noise_2d(x, y)
-			var d = detailNoise.get_noise_2d(x, y)
+			var c = continentNoise.get_noise_2d(x * detailScale, y * detailScale)   # -1 .. 1
+			var b = baseNoise.get_noise_2d(x * detailScale, y * detailScale)
+			var d = detailNoise.get_noise_2d(x * detailScale, y * detailScale)
 			# Combine noise layers at different weights
 			var alt = (c * 0.65) + (b * 0.25) + (d * 0.10)
 			# Normalize to 0..1
@@ -115,7 +128,6 @@ func generateRivers() -> void:
 	# Figure out how many rivers should be made for the map and how big the lakes should be able to get (These equations may need adjusting
 	numOfRivers = int(((mapSizeX * mapSizeY) / 12000) * (1-seaToLandRatio))
 	maxLakeSize = int(600 * (1/(seaToLandRatio + .7)))
-	print(numOfRivers)
 	
 	# Choose a valid point on the map (Criteria: Altitude)
 	var source = null
@@ -217,8 +229,37 @@ func addRiverBanks() -> void:
 				elif currentHeight > shoreLevel:
 					set_cell(Vector2i(x,y),2,Vector2i(5,1)) #Plains Shoreline
 
+func generateTemperature() -> void:
+	temperatureNoise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	temperatureNoise.frequency = 0.005
+	temperatureNoise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	temperatureNoise.fractal_octaves = 3
+
+	for y in range(mapSizeY):
+		for x in range(mapSizeX):
+			var idx = y * mapSizeX + x
+			var noiseEffect = (temperatureNoise.get_noise_2d(x,y) + 1) * .5
+			var altEffect = heightMap[idx] * 0.4
+			var latitudeEffect = (1 - float(y) / mapSizeY) / 6
+			tempMap[idx] = noiseEffect - latitudeEffect# - altEffect
+
+func generateMoisture() -> void:
+	moistureNoise.noise_type = FastNoiseLite.TYPE_SIMPLEX
+	moistureNoise.frequency = 0.005
+	#moistureNoise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	#moistureNoise.fractal_octaves = 3
+	
+	for y in range(mapSizeY):
+		for x in range(mapSizeX):
+			var idx = y * mapSizeX + x
+			var noiseEffect = (moistureNoise.get_noise_2d(x,y) + 1) * .5
+			if heightMap[idx] <= seaLevel:
+				moistMap[idx] = 1
+			else:
+				moistMap[idx] = noiseEffect
 
 func determineAndDrawTileType(x,y) -> void:
+	# Pretty Map
 	if heightMap[(y * mapSizeX) + x] >= highMountainLevel:
 		# Snow / Mountain Peak
 		set_cell(Vector2i(x,y),2,Vector2i(11,0))
@@ -246,3 +287,49 @@ func determineAndDrawTileType(x,y) -> void:
 	elif heightMap[(y * mapSizeX) + x] < seaLevel:
 		# Sea / Ocean
 		set_cell(Vector2i(x,y),2,Vector2i(2,0))
+	
+	# Temperature Map
+	if heightMap[(y * mapSizeX) + x] <= seaLevel:
+		set_cell(Vector2i(x + mapSizeX,y),2,Vector2i(1,0))
+	elif tempMap[(y * mapSizeX) + x] >= .75:
+		set_cell(Vector2i(x + mapSizeX,y),2,Vector2i(0,1))
+	elif tempMap[(y * mapSizeX) + x] >= .50:
+		set_cell(Vector2i(x + mapSizeX,y),2,Vector2i(1,1))
+	elif tempMap[(y * mapSizeX) + x] >= .15:
+		set_cell(Vector2i(x + mapSizeX,y),2,Vector2i(2,1))
+	else:
+		set_cell(Vector2i(x + mapSizeX,y),2,Vector2i(3,1))
+	
+	# Moisture Map
+	if heightMap[(y * mapSizeX) + x] <= seaLevel:
+		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(0,0))
+	elif moistMap[(y * mapSizeX) + x] >= .75:
+		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(3,2))
+	elif moistMap[(y * mapSizeX) + x] >= .50:
+		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(2,2))
+	elif moistMap[(y * mapSizeX) + x] >= .20:
+		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(1,2))
+	else:
+		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(0,2))
+	
+	# Altitude Map
+	if heightMap[(y * mapSizeX) + x] >= highMountainLevel:
+		set_cell(Vector2i(x + mapSizeX ,y + mapSizeY),2,Vector2i(5,3))
+	elif heightMap[(y * mapSizeX) + x] >= mediumMountainLevel:
+		# High Mountain
+		set_cell(Vector2i(x + mapSizeX ,y + mapSizeY),2,Vector2i(4,3))
+	elif heightMap[(y * mapSizeX) + x] >= foothillsLevel:
+		# Medium Mountain
+		set_cell(Vector2i(x + mapSizeX ,y + mapSizeY),2,Vector2i(3,3))
+	elif heightMap[(y * mapSizeX) + x] >= forrestLevel:
+		# Low Mountain
+		set_cell(Vector2i(x + mapSizeX ,y + mapSizeY),2,Vector2i(2,3))
+	elif heightMap[(y * mapSizeX) + x] >= plainsLevel:
+		# Foothills
+		set_cell(Vector2i(x + mapSizeX ,y + mapSizeY),2,Vector2i(1,3))
+	elif heightMap[(y * mapSizeX) + x] >= shoreLevel:
+		# Forrests
+		set_cell(Vector2i(x + mapSizeX ,y + mapSizeY),2,Vector2i(0,3))
+	elif heightMap[(y * mapSizeX) + x] < seaLevel:
+		# Sea / Ocean
+		set_cell(Vector2i(x + mapSizeX ,y + mapSizeY),2,Vector2i(0,0))
