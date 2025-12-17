@@ -4,7 +4,6 @@ extends TileMapLayer
 @export var mapSizeY : int = 400
 
 var heightMap : Array[float] = [] # Contains the altitude for each tile indexed in order
-var tempMap : Array[float] = [] # Contains the Average temperature for each tile
 var moistMap : Array[float] = [] # Contains the Average moisture for each tile
 
 var riverTiles : Array[Vector2i] = [] # Contains all the river tiles we have
@@ -13,7 +12,6 @@ var riverTiles : Array[Vector2i] = [] # Contains all the river tiles we have
 @export var continentFreq : float = 0.0012
 @export var baseFreq : float = 0.005
 @export var detailFreq: float = 0.007
-@export var tempFreq : float = 0.002
 @export var moistFreq : float = 0.005
 
 @export var detailScale : float = 2.00 # This changes the distance between samples in the noise
@@ -29,12 +27,6 @@ var dryLevel : float = -1.0
 var semiDryLevel : float = 0.20
 var semiHumidLevel : float = 0.50
 var humidLevel : float = 0.75
-
-# Temperature Levels
-var coldLevel : float = -1.0
-var coolLevel : float = 0.15
-var warmLevel : float = 0.5
-var hotLevel : float = 0.85
 
 # Altitude Levels set in generateBase()
 var seaLevel : float
@@ -71,8 +63,6 @@ func generateWorld() -> void:
 	riverTiles.clear()
 	heightMap.clear()
 	heightMap.resize(mapSizeX * mapSizeY)
-	tempMap.clear()
-	tempMap.resize(mapSizeX * mapSizeY)
 	moistMap.clear()
 	moistMap.resize(mapSizeX * mapSizeY)
 	
@@ -80,8 +70,6 @@ func generateWorld() -> void:
 	generateBase()
 	
 	generateRivers()
-	
-	generateTemperature()
 	
 	generateMoisture()
 	
@@ -126,8 +114,8 @@ func generateBase() -> void:
 			var d = detailNoise.get_noise_2d(x * detailScale, y * detailScale)
 			# Combine noise layers at different weights
 			var alt = (c * 0.65) + (b * 0.25) + (d * 0.10)
-			# Normalize to 0..1
-			alt = (alt + 1.0) * 0.5
+			# Normalize to 0 through 10
+			alt = (alt + 1.0) * 5
 			heightMap[idx] = alt
 			altitudes[idx] = alt
 	# determine sea level based on ratio
@@ -250,20 +238,6 @@ func generateRivers() -> void:
 #				elif currentHeight > shoreLevel:
 #					set_cell(Vector2i(x,y),2,Vector2i(5,1)) #Plains Shoreline
 
-func generateTemperature() -> void:
-	temperatureNoise.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	temperatureNoise.frequency = 0.005
-	temperatureNoise.fractal_type = FastNoiseLite.FRACTAL_FBM
-	temperatureNoise.fractal_octaves = 3
-
-	for y in range(mapSizeY):
-		for x in range(mapSizeX):
-			var idx = y * mapSizeX + x
-			var noiseEffect = (temperatureNoise.get_noise_2d(x,y) + 1) * .5
-			#var altEffect = heightMap[idx] * 0.4
-			var latitudeEffect = (1 - float(y) / mapSizeY) / 6
-			tempMap[idx] = noiseEffect - latitudeEffect# - altEffect
-
 func generateMoisture() -> void:
 	moistureNoise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	moistureNoise.frequency = moistFreq
@@ -281,7 +255,6 @@ func determineAndDrawTileType(x,y) -> void:
 	# Go through each tile and determine what type it should be. Start with getting all of it's info. (Could be used to set final data for the finished map when moving on to other parts of the game)
 	var i = (y * mapSizeX) + x
 	var alt = heightMap[i]
-	var temp = tempMap[i]
 	var moisture = moistMap[i]
 	
 	if alt <= seaLevel:
@@ -291,56 +264,37 @@ func determineAndDrawTileType(x,y) -> void:
 		# Shore
 		set_cell(Vector2i(x,y),2,Vector2i(2,0))
 		
-	elif alt <= lowlandsLevel || alt <= highlandsLevel || alt <= mountainLevel:
-		# Lowlands and Highlands and Low Mountains/Foothills
-		if temp >= hotLevel:
-			# HOT Biomes
-			if moisture >= humidLevel || moisture >= semiHumidLevel:
-				# Hot and Humid: rainforest # Hot and Semi-Humid: rainforest
-				set_cell(Vector2i(x,y),2,Vector2i(10,2))
-			elif moisture >= semiDryLevel:
-				# Hot and Semi-Dry: Savanna
-				set_cell(Vector2i(x,y),2,Vector2i(9,2))
-			elif moisture >= dryLevel:
-				# Hot and Dry: Desert
-				set_cell(Vector2i(x,y),2,Vector2i(7,2))
-		elif temp >= warmLevel:
-			# Warm Biomes
-			if moisture >= humidLevel || moisture >= semiHumidLevel:
-				# Warm and Humid and Semi-Humid: forest/woodland
-				set_cell(Vector2i(x,y),2,Vector2i(11,0))
-			elif moisture >= semiDryLevel:
-				# Warm and Semi-Dry: Grassland/Plains
-				set_cell(Vector2i(x,y),2,Vector2i(10,0))
-			elif moisture >= dryLevel:
-				# Warm and Dry: Mesa
-				set_cell(Vector2i(x,y),2,Vector2i(8,2))
-		elif temp >= coolLevel:
-			# Kinda Cold Biomes
-			if moisture >= humidLevel:
-				# Cool and Humid: Pacific NW / Autumn
-				set_cell(Vector2i(x,y),2,Vector2i(11,2))
-			elif moisture >= semiHumidLevel:
-				# Cool and Semi-Humid: Forest/Woodland
-				set_cell(Vector2i(x,y),2,Vector2i(11,0))
-			elif moisture >= semiDryLevel:
-				# Cool and Semi-Dry: Grassland/Plains
-				set_cell(Vector2i(x,y),2,Vector2i(10,0))
-			elif moisture >= dryLevel:
-				# Cool and Dry: Tundra
-				set_cell(Vector2i(x,y),2,Vector2i(8,0))
-		elif temp >= coldLevel:
-			# Chilly Biomes
-			if moisture >= humidLevel || moisture >= semiHumidLevel:
-				# Cold and Humid AND Cold and Semi-Humid: Boreal Forrest
-				set_cell(Vector2i(x,y),2,Vector2i(9,0))
-			elif moisture >= semiDryLevel:
-				# Cold and Semi-Dry: Tundra
-				set_cell(Vector2i(x,y),2,Vector2i(8,0))
-			elif moisture >= dryLevel:
-				# Cold and Dry: Polar Desert/Antarcitca
-				set_cell(Vector2i(x,y),2,Vector2i(7,0))
-		
+	elif alt <= lowlandsLevel: 
+		# Lowlands
+		if moisture <= semiDryLevel:
+			set_cell(Vector2i(x,y),2,Vector2i(10,2))
+		elif moisture <= semiHumidLevel:
+			set_cell(Vector2i(x,y),2,Vector2i(9,2))
+		elif moisture <= humidLevel:
+			set_cell(Vector2i(x,y),2,Vector2i(8,2))
+		else:
+			set_cell(Vector2i(x,y),2,Vector2i(7,2))
+	elif alt <= highlandsLevel:
+		# Highlands
+		if moisture <= semiDryLevel:
+			set_cell(Vector2i(x,y),2,Vector2i(10,1))
+		elif moisture <= semiHumidLevel:
+			set_cell(Vector2i(x,y),2,Vector2i(9,1))
+		elif moisture <= humidLevel:
+			set_cell(Vector2i(x,y),2,Vector2i(8,1))
+		else:
+			set_cell(Vector2i(x,y),2,Vector2i(7,1))
+		pass
+	elif alt <= mountainLevel:
+		# Foothills
+		if moisture <= semiDryLevel:
+			set_cell(Vector2i(x,y),2,Vector2i(10,0))
+		elif moisture <= semiHumidLevel:
+			set_cell(Vector2i(x,y),2,Vector2i(9,0))
+		elif moisture <= humidLevel:
+			set_cell(Vector2i(x,y),2,Vector2i(8,0))
+		else:
+			set_cell(Vector2i(x,y),2,Vector2i(7,0))
 	elif alt <= peakLevel:
 		# Mountains
 		set_cell(Vector2i(x,y),2,Vector2i(4,0))
@@ -350,49 +304,37 @@ func determineAndDrawTileType(x,y) -> void:
 
 func drawDataMaps(x,y) -> void:
 	var indx = (y * mapSizeX) + x
-	# Temperature Map
-	if heightMap[indx] <= seaLevel:
-		set_cell(Vector2i(x + mapSizeX,y),2,Vector2i(1,0))
-	elif tempMap[indx] >= hotLevel:
-		set_cell(Vector2i(x + mapSizeX,y),2,Vector2i(0,1))
-	elif tempMap[indx] >= warmLevel:
-		set_cell(Vector2i(x + mapSizeX,y),2,Vector2i(1,1))
-	elif tempMap[indx] >= coolLevel:
-		set_cell(Vector2i(x + mapSizeX,y),2,Vector2i(2,1))
-	elif tempMap[indx] >= coldLevel:
-		set_cell(Vector2i(x + mapSizeX,y),2,Vector2i(3,1))
-	
 	# Moisture Map
 	if heightMap[indx] <= seaLevel:
 		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(0,0))
 	elif moistMap[indx] >= humidLevel:
-		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(3,2))
+		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(3,4))
 	elif moistMap[indx] >= semiHumidLevel:
-		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(2,2))
+		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(2,4))
 	elif moistMap[indx] >= semiDryLevel:
-		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(1,2))
+		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(1,4))
 	elif moistMap[indx] >= dryLevel:
-		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(0,2))
+		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(0,4))
 	
 	# Altitude Map
 	if heightMap[indx] <= seaLevel:
 		# Ocean
-		set_cell(Vector2i(x + mapSizeX,y + mapSizeY),2,Vector2i(0,0))
+		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(0,0))
 	elif heightMap[indx] <= shoreLevel:
 		# Shore
-		set_cell(Vector2i(x + mapSizeX,y + mapSizeY),2,Vector2i(0,3))
+		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(0,5))
 	elif heightMap[indx] <= lowlandsLevel:
 		# Lowlands
-		set_cell(Vector2i(x + mapSizeX,y + mapSizeY),2,Vector2i(1,3))
+		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(1,5))
 	elif heightMap[indx] <= highlandsLevel:
 		# Highlands
-		set_cell(Vector2i(x + mapSizeX,y + mapSizeY),2,Vector2i(2,3))
+		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(2,5))
 	elif heightMap[indx] <= mountainLevel:
 		# Mountains
-		set_cell(Vector2i(x + mapSizeX,y + mapSizeY),2,Vector2i(3,3))
+		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(3,5))
 	elif heightMap[indx] <= peakLevel:
 		# High Mountains?
-		set_cell(Vector2i(x + mapSizeX,y + mapSizeY),2,Vector2i(4,3))
+		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(4,5))
 	else:
 		# Peaks
-		set_cell(Vector2i(x + mapSizeX,y + mapSizeY),2,Vector2i(5,3))
+		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(5,5))
