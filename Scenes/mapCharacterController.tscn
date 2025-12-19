@@ -1,6 +1,6 @@
 [gd_scene load_steps=4 format=3 uid="uid://cyvaceevmq66u"]
 
-[ext_resource type="Script" uid="uid://ot8cb7dvykg7" path="res://mapCharacterController.gd" id="1_gvjti"]
+[ext_resource type="Script" uid="uid://ot8cb7dvykg7" path="res://Scripts/mapCharacterController.gd" id="1_gvjti"]
 [ext_resource type="Texture2D" uid="uid://c15lbn5yfta1v" path="res://Assets/Cursor.png" id="2_gvjti"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_pa054"]
