@@ -3,8 +3,9 @@ extends TileMapLayer
 @export var gridSizeX : int = 400
 @export var gridSizeY : int = 400
 
-@export var numOfPoints : int = 10
-var points : Array[Vector2i] = []
+@export var numOfPoints : int = 5
+var points : Array[Vector2i] = [] # The point that is the "centerish" of a continental plate
+var pointsDir : Array[Vector2i] = [] # The direction that a given point is "drifitng in"
 var warped_points : Array[Vector2] = []
 
 var noise := FastNoiseLite.new()
@@ -12,8 +13,8 @@ var noise := FastNoiseLite.new()
 func _ready() -> void:
 	# Setup noise parameters for smooth warping
 	noise.seed = randi()
-	noise.fractal_octaves = 2
-	noise.frequency =.005
+	noise.fractal_octaves = 4
+	noise.frequency =.008
 	
 	generatePoints()
 
@@ -24,12 +25,14 @@ func _process(delta: float) -> void:
 			for x in range(gridSizeX):
 				findClosestPoint(x, y, warped_points)
 		
-		# Draw those points as black squares
+		# Draw those points based on the direction they are drifting
 		for i in points.size():
-			set_cell(points[i], 0, Vector2i(0, 5))
+			set_cell(points[i], 0, Vector2i(0, 5)) 
+
 
 func reset() -> void:
 	points.clear()
+	pointsDir.clear()
 	warped_points.clear()
 	for y in range(gridSizeY):
 		for x in range(gridSizeX):
@@ -39,8 +42,19 @@ func generatePoints() -> void:
 	reset()
 	
 	for i in range(numOfPoints):
-		var p = Vector2i(randi() % gridSizeX, randi() % gridSizeY)
-		points.push_back(p)
+		var point = Vector2i(randi() % gridSizeX, randi() % gridSizeY)
+		points.push_back(point)
+		# Generate random direction vector 
+		var direction = randi() % 4
+		match  direction:
+			0:
+				pointsDir.push_front(Vector2i(1,0))
+			1:
+				pointsDir.push_front(Vector2i(-1,0))
+			2:
+				pointsDir.push_front(Vector2i(0,1))
+			3:
+				pointsDir.push_front(Vector2i(0,-1))
 		
 	warped_points = []
 	for p in points:
@@ -57,6 +71,7 @@ func findClosestPoint(x: int, y: int, warped_points: Array) -> void:
 	var target = warp_position(Vector2i(x, y))
 	
 	var closestIndex = -1
+	var secondClosestIndex = -1
 	var closestDistance = INF
 	var secondClosestDistance = INF
 	
@@ -64,15 +79,29 @@ func findClosestPoint(x: int, y: int, warped_points: Array) -> void:
 		var d = target.distance_to(warped_points[i])
 		if d < closestDistance:
 			secondClosestDistance = closestDistance
+			secondClosestIndex = closestIndex
 			closestDistance = d
 			closestIndex = i
 		elif d < secondClosestDistance:
 			secondClosestDistance = d
+			secondClosestIndex = i
 	
-	var EDGE_THRESHOLD = 0.5  # increase to thicken edges
+	var EDGE_THRESHOLD = 1  # increase to thicken edges
 	
 	if abs(secondClosestDistance - closestDistance) < EDGE_THRESHOLD:
 		# This cell is on an edge
-		set_cell(Vector2i(x, y), 0, Vector2i(0, 5))  # Black tile for edge
+		if (pointsDir[closestIndex] - pointsDir[secondClosestIndex]) != Vector2i(0,0):
+			set_cell(Vector2i(x, y), 0, Vector2i(0, 3))  # Black tile for edge
+		else:
+			set_cell(Vector2i(x, y), 0, Vector2i(0, 5))  # Black tile for edge
 	else:
-		set_cell(Vector2i(x, y), 0, Vector2i((closestIndex % 4), 3))
+		#set_cell(Vector2i(x, y), 0, Vector2i((closestIndex % 4) + 2, 5))
+		match pointsDir[closestIndex]:
+			Vector2i(0,1):
+				set_cell(Vector2i(x, y), 0, Vector2i(5, 0)) # Moving Up : White / Snow
+			Vector2i(0,-1):
+				set_cell(Vector2i(x, y), 0, Vector2i(10, 1)) # Moving Down : Orange / Tan
+			Vector2i(1,0):
+				set_cell(Vector2i(x, y), 0, Vector2i(2, 4)) # Moving Right : Green
+			Vector2i(-1,0):
+				set_cell(Vector2i(x, y), 0, Vector2i(0, 0)) # Moving Left : Blue
