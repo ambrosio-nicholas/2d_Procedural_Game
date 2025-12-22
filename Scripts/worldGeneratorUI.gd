@@ -1,8 +1,8 @@
 extends CanvasLayer
 
 # ------------ UI Elements -------------
-@onready var continentSlider : HSlider = $ContinentFreqSlider
-@onready var continentFreqText : Label = $ContinentFreqLabel
+@onready var plateSlider : HSlider = $ContinentFreqSlider
+@onready var plateFreqText : Label = $ContinentFreqLabel
 @onready var baseSlider : HSlider = $BaseFreqSlider
 @onready var baseFreqText : Label = $BaseFreqLabel
 @onready var detailSlider : HSlider = $DetailFreqSlider
@@ -27,8 +27,8 @@ var needsToUpdate : bool = false
 # Called when the node enters the scene tree for the first time.
 func _ready() -> void:
 	# Set the sliders to pre-set values
-	continentSlider.value = worldGenerator.continentFreq
-	continentSlider.step = 0.0001
+	plateSlider.value = worldGenerator.plateFreq
+	plateSlider.step = 0.001
 	baseSlider.value = worldGenerator.baseFreq
 	detailSlider.value = worldGenerator.detailFreq
 	seaVsLandSlider.value = worldGenerator.seaToLandRatio
@@ -37,15 +37,15 @@ func _ready() -> void:
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
 	# Update the labels for the sliders
-	continentFreqText.text = str("Continent Freq: ", continentSlider.value)
+	plateFreqText.text = str("Plate Freq: ", plateSlider.value)
 	baseFreqText.text = str("Base Freq: ", baseSlider.value)
 	detailFreqText.text = str("Detail Freq: ", detailSlider.value)
 	seaVsLandText.text = str("Sea to Land Ratio: ", seaVsLandSlider.value)
 	detailScaleLabel.text = str("Scale Multiplier: ", detailScaleSlider.value)
 	
 	# If the value has changed, udpate it with the new value
-	if worldGenerator.continentFreq != continentSlider.value:
-		worldGenerator.continentFreq = continentSlider.value
+	if worldGenerator.plateFreq != plateSlider.value:
+		worldGenerator.plateFreq = plateSlider.value
 		needsToUpdate = true
 	if worldGenerator.baseFreq != baseSlider.value:
 		worldGenerator.baseFreq = baseSlider.value

@@ -5,11 +5,15 @@ extends TileMapLayer
 
 var heightMap : Array[float] = [] # Contains the altitude for each tile indexed in order
 var moistMap : Array[float] = [] # Contains the Average moisture for each tile
+var plateIndexArray : Array[int] = [] # Contain the index of the point each tile belongs to (which continent it is on)
+var platePoints : Array[Vector2i] = [] # Contains the point locations for each tectonic plate
 
 var riverTiles : Array[Vector2i] = [] # Contains all the river tiles we have
 
 #-----------------Terrain Parameters-----------------
-@export var continentFreq : float = 0.0012
+@export var plateFreq : float = 0.0012
+@export var numOfPlates : int = 5
+
 @export var baseFreq : float = 0.005
 @export var detailFreq: float = 0.007
 @export var moistFreq : float = 0.005
@@ -37,7 +41,8 @@ var mountainLevel : float
 var peakLevel : float
 
 #-----------------Noise Layers-----------------
-var continentNoise = FastNoiseLite.new()
+var plateNoise = FastNoiseLite.new()
+
 var baseNoise = FastNoiseLite.new()
 var detailNoise = FastNoiseLite.new()
 var moistureNoise = FastNoiseLite.new()
@@ -53,9 +58,17 @@ func reseedWorld() -> void:
 	# randomize the noise layers
 	baseNoise.seed = randi()
 	detailNoise.seed = randi()
-	continentNoise.seed = randi()
+	plateNoise.seed = randi()
 	temperatureNoise.seed = randi()
 	moistureNoise.seed = randi()
+	
+	# Generate tectonic plate points for vornoi diagram
+	platePoints.clear()
+	platePoints.resize(numOfPlates)
+	for i in range(numOfPlates):
+		platePoints[i] = Vector2i( randi() % mapSizeX , randi() % mapSizeY)
+		# Warp the point by some noise (Not necessary, but keeping just in case)
+		#points[i] = Vector2i ( clamp( points[i].x + plateNoise.get_noise_2d( points[i].x , points[i].y ) * 40, 0, mapSizeX - 1) , clamp( points[i].y + plateNoise.get_noise_2d( points[i].x + 1000 , points[i].y + 1000 ) * 40, 0, mapSizeY - 1) )
 
 func generateWorld() -> void:
 	# clear away any old world and prep for a new one
@@ -65,11 +78,13 @@ func generateWorld() -> void:
 	heightMap.resize(mapSizeX * mapSizeY)
 	moistMap.clear()
 	moistMap.resize(mapSizeX * mapSizeY)
+	plateIndexArray.clear()
+	plateIndexArray.resize(mapSizeX * mapSizeY)
 	
 	# generate the base part of the world
-	generateBase()
+	generateTerrain()
 	
-	generateRivers()
+	#generateRivers()
 	
 	generateMoisture()
 	
@@ -84,13 +99,12 @@ func generateWorld() -> void:
 	for i in range(riverTiles.size()):
 		set_cell(riverTiles[i],2,Vector2i(1,0))
 
-func generateBase() -> void:
-	# Continent Noise
-	continentNoise.noise_type = FastNoiseLite.TYPE_SIMPLEX
-	continentNoise.fractal_type = FastNoiseLite.FRACTAL_FBM
-	continentNoise.frequency = continentFreq      # VERY low = continent size
-	continentNoise.fractal_octaves = 3
-	continentNoise.fractal_lacunarity = 2.0
+func generateTerrain() -> void:
+	# Tectonic Plate Noise
+	plateNoise.fractal_octaves = 4
+	plateNoise.frequency = plateFreq      # Affects the borders between plates
+	generateTectonics()
+	
 	# Base Terrain Noise (Biomes maybe?)
 	baseNoise.noise_type = FastNoiseLite.TYPE_SIMPLEX
 	baseNoise.frequency = baseFreq
@@ -101,19 +115,20 @@ func generateBase() -> void:
 	detailNoise.frequency = detailFreq
 	detailNoise.fractal_type = FastNoiseLite.FRACTAL_RIDGED
 	detailNoise.fractal_octaves = 4
+	
 	# Create altitude list
 	var altitudes : Array[float] = []
 	altitudes.resize(mapSizeX * mapSizeY)
 	heightMap.resize(mapSizeX * mapSizeY)
 	for y in range(mapSizeY):
 		for x in range(mapSizeX):
-			var idx := x * mapSizeY + y
+			var idx = x * mapSizeY + y
 			# Get values
-			var c = continentNoise.get_noise_2d(x * detailScale, y * detailScale)   # -1 .. 1
 			var b = baseNoise.get_noise_2d(x * detailScale, y * detailScale)
 			var d = detailNoise.get_noise_2d(x * detailScale, y * detailScale)
+			var c = plateNoise.get_noise_2d(x * detailScale, y * detailScale) # c may get removed as it's tied to plate tectonics
 			# Combine noise layers at different weights
-			var alt = (c * 0.65) + (b * 0.25) + (d * 0.10)
+			var alt = (c * 0.05) + (b * 0.65) + (d * 0.3) # c may get removed as it's tied to plate tectonics
 			# Normalize to 0 through 10
 			alt = (alt + 1.0) * 5
 			heightMap[idx] = alt
@@ -131,6 +146,37 @@ func generateBase() -> void:
 	highlandsLevel = landAltitudes[int(.80 * landCount)]
 	mountainLevel = landAltitudes[int(.97 * landCount)]
 	peakLevel = landAltitudes[int(.99 * landCount)]
+
+func generateTectonics() -> void:
+	# This function will create "tectonic plates" using a variation of a vornoi diagram (The points are generated in reseedWorld()
+	
+	# Check for every tile on the map and see whichever point is closest, assign the closest point as the plateIndexArray
+	for x in range(mapSizeX):
+		for y in range(mapSizeY):
+			var closestIndex = -1
+			var closestDistance = INF
+			var secondClosestDistance = INF
+			
+			# Warp the point using noise
+			var warpedX = x + plateNoise.get_noise_2d( x , y ) * 40
+			var warpedY = y + plateNoise.get_noise_2d( x + 1000 , y + 1000 ) * 40
+			
+			# Go through each tectonic plate point and find which is the closest and which is the second closest (find their indexes)
+			for i in range(numOfPlates):
+				var d = Vector2i(warpedX,warpedY).distance_squared_to(platePoints[i])
+				if d < closestDistance:
+					secondClosestDistance = closestDistance
+					closestIndex = i
+					closestDistance = d
+				elif d < secondClosestDistance:
+					secondClosestDistance = d
+			
+			# Assign the final plateIndexArray for that point. If it's an edge, assign it a value of -1
+			var edgeWidth = 500
+			if abs(secondClosestDistance - closestDistance) < edgeWidth:
+				plateIndexArray[(y * mapSizeX) + x] = -1
+			else:
+				plateIndexArray[(y * mapSizeX) + x] = closestIndex
 
 func generateRivers() -> void:
 	# Figure out how many rivers should be made for the map and how big the lakes should be able to get (These equations may need adjusting
@@ -338,3 +384,9 @@ func drawDataMaps(x,y) -> void:
 	else:
 		# Peaks
 		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(5,5))
+	
+	# "Tectonic Plate" Map
+	if plateIndexArray[indx] == -1:
+		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(0,5))
+	else:
+		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i((plateIndexArray[indx] % 4) + 1,5))
