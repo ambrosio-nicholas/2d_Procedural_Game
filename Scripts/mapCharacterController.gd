@@ -26,23 +26,23 @@ func getMovement() -> void:
 		SPEED = 32
 	# Fine movement with arrow keys
 	if Input.is_action_just_pressed("ui_down"):
-		position.y = clamp(position.y + SPEED, 0, (mapSizeY * 32) - 32)
+		position.y = clamp(position.y + SPEED, 0, (mapSizeY * 64) - 32)
 	if Input.is_action_just_pressed("ui_up"):
-		position.y = clamp(position.y - SPEED, 0, (mapSizeY * 32) - 32)
+		position.y = clamp(position.y - SPEED, 0, (mapSizeY * 64) - 32)
 	if Input.is_action_just_pressed("ui_right"):
-		position.x = clamp(position.x + SPEED, 0, (mapSizeX * 32) - 32)
+		position.x = clamp(position.x + SPEED, 0, (mapSizeX * 64) - 32)
 	if Input.is_action_just_pressed("ui_left"):
-		position.x = clamp(position.x - SPEED, 0, (mapSizeX * 32) - 32)
+		position.x = clamp(position.x - SPEED, 0, (mapSizeX * 64) - 32)
 		
 	# Quick movement with WASD
 	if Input.is_key_pressed(KEY_S):
-		position.y = clamp(position.y + SPEED, 0, (mapSizeY * 32) - 32)
+		position.y = clamp(position.y + SPEED, 0, (mapSizeY * 64) - 32)
 	if Input.is_key_pressed(KEY_W):
-		position.y = clamp(position.y - SPEED, 0, (mapSizeY * 32) - 32)
+		position.y = clamp(position.y - SPEED, 0, (mapSizeY * 64) - 32)
 	if Input.is_key_pressed(KEY_D):
-		position.x = clamp(position.x + SPEED, 0, (mapSizeX * 32) - 32)
+		position.x = clamp(position.x + SPEED, 0, (mapSizeX * 64) - 32)
 	if Input.is_key_pressed(KEY_A):
-		position.x = clamp(position.x - SPEED, 0, (mapSizeX * 32) - 32)
+		position.x = clamp(position.x - SPEED, 0, (mapSizeX * 64) - 32)
 
 func getCameraZoom() -> void:
 	var zoom = camera.zoom.x   # uniform zoom assumed

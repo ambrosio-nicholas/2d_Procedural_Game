@@ -1,22 +1,28 @@
 extends TileMapLayer
 
+class tectonicPlate:
+	var dirVector : Vector2i = Vector2i(0,0)
+	var pointCoords : Vector2i
+	var isOceanic : bool = 0 # 0 = Continental, 1 = Oceanic
+	var moisture : float = 0.3 # Average humidity level of the tectonic plate
+
 @export var mapSizeX : int = 400
 @export var mapSizeY : int = 400
 
 var heightMap : Array[float] = [] # Contains the altitude for each tile indexed in order
 var moistMap : Array[float] = [] # Contains the Average moisture for each tile
-var plateIndexArray : Array[int] = [] # Contain the index of the point each tile belongs to (which continent it is on)
-var platePoints : Array[Vector2i] = [] # Contains the point locations for each tectonic plate
+var plateIndexArray : Array[int] = [] # Contain the index of the point each tile belongs to (which continent it is on) (-1 is for fault line and -2 is for shore line)
+var tectonicPlates : Array[tectonicPlate] = [] # Contains the plates for the world
 
 var riverTiles : Array[Vector2i] = [] # Contains all the river tiles we have
 
 #-----------------Terrain Parameters-----------------
-@export var plateFreq : float = 0.0012
-@export var numOfPlates : int = 5
+@export var plateFreq : float = 0.008
+@export var numOfPlates : int = 6
 
-@export var baseFreq : float = 0.005
-@export var detailFreq: float = 0.007
-@export var moistFreq : float = 0.005
+@export var baseFreq : float = 0.002
+@export var detailFreq: float = 0.003
+@export var moistFreq : float = 0.001
 
 @export var detailScale : float = 2.00 # This changes the distance between samples in the noise
 
@@ -63,12 +69,35 @@ func reseedWorld() -> void:
 	moistureNoise.seed = randi()
 	
 	# Generate tectonic plate points for vornoi diagram
-	platePoints.clear()
-	platePoints.resize(numOfPlates)
-	for i in range(numOfPlates):
-		platePoints[i] = Vector2i( randi() % mapSizeX , randi() % mapSizeY)
-		# Warp the point by some noise (Not necessary, but keeping just in case)
-		#points[i] = Vector2i ( clamp( points[i].x + plateNoise.get_noise_2d( points[i].x , points[i].y ) * 40, 0, mapSizeX - 1) , clamp( points[i].y + plateNoise.get_noise_2d( points[i].x + 1000 , points[i].y + 1000 ) * 40, 0, mapSizeY - 1) )
+	tectonicPlates.clear()
+	for i in range(numOfPlates - 1):
+		# Generate a new tectonic plate and choose its coords
+		tectonicPlates.push_front(tectonicPlate.new())
+		tectonicPlates[0].pointCoords = Vector2i( randi() % mapSizeX , randi() % mapSizeY)
+		# Assign a random direction Vector for the plate
+		var rand = randi() % 4
+		if rand == 0: tectonicPlates[0].dirVector = Vector2i(1,0)
+		elif rand == 1: tectonicPlates[0].dirVector = Vector2i(-1,0)
+		elif rand == 2: tectonicPlates[0].dirVector = Vector2i(0,1)
+		elif rand == 3: tectonicPlates[0].dirVector = Vector2i(0,-1)
+		# Assign a moisture level to the plate
+		rand = randi() % 6 # 16% chance of dry, 32% chance of semi-dry, 32% chance of semi-humid, 16% chance of humid
+		if rand == 0: tectonicPlates[0].moisture = -1
+		elif rand == 1 || rand == 2: tectonicPlates[0].moisture = 0.21
+		elif rand == 3 || rand == 4: tectonicPlates[0].moisture = 0.51
+		elif rand == 5: tectonicPlates[0].moisture = 0.75
+		# Make the plate continental
+		tectonicPlates[0].isOceanic = 0
+
+	# Generate one tile that is garunteed to be oceanic along one of the edges (First plate in the array)
+	tectonicPlates.push_front(tectonicPlate.new())
+	tectonicPlates[0].isOceanic = 1
+	var edge = randi() % 4
+	if edge == 0: tectonicPlates[0].pointCoords = Vector2i(randi() % (mapSizeX / 5), randi() % mapSizeY)
+	elif edge == 1: tectonicPlates[0].pointCoords = Vector2i(randi() % (mapSizeX / 5) + (mapSizeX * 0.8), randi() % mapSizeY)
+	elif edge == 2: tectonicPlates[0].pointCoords = Vector2i(randi() % mapSizeX, randi() % (mapSizeY / 5))
+	elif edge == 3: tectonicPlates[0].pointCoords = Vector2i(randi() % mapSizeX, randi() % (mapSizeY / 5) + (mapSizeY * 0.8))
+
 
 func generateWorld() -> void:
 	# clear away any old world and prep for a new one
@@ -84,7 +113,7 @@ func generateWorld() -> void:
 	# generate the base part of the world
 	generateTerrain()
 	
-	#generateRivers()
+	generateRivers()
 	
 	generateMoisture()
 	
@@ -131,12 +160,16 @@ func generateTerrain() -> void:
 			var alt = (c * 0.05) + (b * 0.65) + (d * 0.3) # c may get removed as it's tied to plate tectonics
 			# Normalize to 0 through 10
 			alt = (alt + 1.0) * 5
+			# Make Oceanic Plate tiles under sea level
+			if plateIndexArray[idx] == 0: alt *= -1
+			if plateIndexArray[idx] == -1: alt *= 3
+			
 			heightMap[idx] = alt
 			altitudes[idx] = alt
 	# determine sea level based on ratio
 	altitudes.sort()
 	var seaIndex = int((mapSizeX * mapSizeY) * seaToLandRatio)
-	seaLevel = altitudes[seaIndex]
+	seaLevel = 0
 	
 	var landAltitudes = altitudes.slice(seaIndex, (mapSizeX * mapSizeY))
 	var landCount = landAltitudes.size()
@@ -154,6 +187,7 @@ func generateTectonics() -> void:
 	for x in range(mapSizeX):
 		for y in range(mapSizeY):
 			var closestIndex = -1
+			var secondClosestIndex = -1
 			var closestDistance = INF
 			var secondClosestDistance = INF
 			
@@ -163,18 +197,23 @@ func generateTectonics() -> void:
 			
 			# Go through each tectonic plate point and find which is the closest and which is the second closest (find their indexes)
 			for i in range(numOfPlates):
-				var d = Vector2i(warpedX,warpedY).distance_squared_to(platePoints[i])
+				var d = Vector2i(warpedX,warpedY).distance_squared_to(tectonicPlates[i].pointCoords)
 				if d < closestDistance:
 					secondClosestDistance = closestDistance
+					secondClosestIndex = closestIndex
 					closestIndex = i
 					closestDistance = d
 				elif d < secondClosestDistance:
 					secondClosestDistance = d
+					secondClosestIndex = i
 			
 			# Assign the final plateIndexArray for that point. If it's an edge, assign it a value of -1
 			var edgeWidth = 500
-			if abs(secondClosestDistance - closestDistance) < edgeWidth:
+			if (abs(secondClosestDistance - closestDistance) < edgeWidth) && (tectonicPlates[closestIndex].dirVector != Vector2i(0,0) && tectonicPlates[secondClosestIndex].dirVector != Vector2i(0,0)): # Add this for mountains only along fault lines moving in different directions: && (tectonicPlates[closestIndex].dirVector - tectonicPlates[secondClosestIndex].dirVector != Vector2i(0,0))
 				plateIndexArray[(y * mapSizeX) + x] = -1
+				plateIndexArray[(y * mapSizeX) + x] = tectonicPlates[closestIndex].moisture
+			elif (abs(secondClosestDistance - closestDistance) < edgeWidth):
+				plateIndexArray[(y * mapSizeX) + x] = -2
 			else:
 				plateIndexArray[(y * mapSizeX) + x] = closestIndex
 
@@ -291,11 +330,13 @@ func generateMoisture() -> void:
 	for y in range(mapSizeY):
 		for x in range(mapSizeX):
 			var idx = y * mapSizeX + x
-			var noiseEffect = (moistureNoise.get_noise_2d(x,y) + 1) * .5
+			var noiseEffect = (moistureNoise.get_noise_2d(x,y) + 1) * .1
 			if heightMap[idx] <= seaLevel:
 				moistMap[idx] = 1
+			elif plateIndexArray[idx] == -2: # Shoreline
+				moistMap[idx] = 0 
 			else:
-				moistMap[idx] = noiseEffect
+				moistMap[idx] = tectonicPlates[plateIndexArray[idx]].moisture + noiseEffect
 
 func determineAndDrawTileType(x,y) -> void:
 	# Go through each tile and determine what type it should be. Start with getting all of it's info. (Could be used to set final data for the finished map when moving on to other parts of the game)
@@ -388,5 +429,11 @@ func drawDataMaps(x,y) -> void:
 	# "Tectonic Plate" Map
 	if plateIndexArray[indx] == -1:
 		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(0,5))
+	elif plateIndexArray[indx] == -2:
+		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(5,5))
+	elif plateIndexArray[indx] == 0:
+		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(1,0))
 	else:
 		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i((plateIndexArray[indx] % 4) + 1,5))
+	for i in range(tectonicPlates.size()):
+		set_cell(Vector2i(tectonicPlates[i].pointCoords.x + mapSizeX, tectonicPlates[i].pointCoords.y + mapSizeY), 2, Vector2i(9,1))

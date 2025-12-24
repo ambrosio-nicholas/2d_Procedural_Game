@@ -71,8 +71,8 @@ func _process(delta: float) -> void:
 		worldGenerator.generateWorld()
 	
 	# Display the coords and altitude of the tile the player is currently over
-	playerCoords = Vector2i(roundi((player.position.x) / 32), roundi((player.position.y) / 32))
+	playerCoords = Vector2i(roundi((player.position.x) / 32) % mapSizeX, roundi((player.position.y) / 32) % mapSizeY)
 	if worldGenerator.heightMap.size() == 0:
 		tileInfoLabel.text = "Tile: N/A"
 	else:
-		tileInfoLabel.text = str("Tile: ", playerCoords, " | Altitude: ", worldGenerator.heightMap[(playerCoords.y * mapSizeX) + playerCoords.x], " | Avg Humidity: ", worldGenerator.moistMap[(playerCoords.y * mapSizeX) + playerCoords.x])
+		tileInfoLabel.text = str("Tile: ", playerCoords, " | Altitude: ", worldGenerator.heightMap[((playerCoords.y * mapSizeX) + playerCoords.x) % (mapSizeX * mapSizeY)], " | Avg Humidity: ", worldGenerator.moistMap[((playerCoords.y * mapSizeX) + playerCoords.x)  % (mapSizeX * mapSizeY)])

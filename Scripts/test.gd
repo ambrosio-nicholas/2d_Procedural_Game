@@ -51,19 +51,19 @@ func generatePoints() -> void:
 	var point = null
 	var edge = randi() % 4
 	if edge == 0:
-		point =Vector2i(randi() % (gridSizeX / 10), randi() % gridSizeY)
+		point = Vector2i(randi() % (gridSizeX / 10), randi() % gridSizeY)
 		points.push_front(point)
 		pointsDir.push_front(Vector2i(-1,0))
 	elif edge == 1:
-		point =Vector2i(randi() % (gridSizeX / 10) + (gridSizeX * 0.9), randi() % gridSizeY)
+		point = Vector2i(randi() % (gridSizeX / 10) + (gridSizeX * 0.9), randi() % gridSizeY)
 		points.push_front(point)
 		pointsDir.push_front(Vector2i(-1,0))
 	elif edge == 2:
-		point =Vector2i(randi() % gridSizeX, randi() % (gridSizeY / 10))
+		point = Vector2i(randi() % gridSizeX, randi() % (gridSizeY / 10))
 		points.push_front(point)
 		pointsDir.push_front(Vector2i(-1,0))
 	elif edge == 3:
-		point =Vector2i(randi() % gridSizeX, randi() % (gridSizeY / 10) + (gridSizeY * 0.9))
+		point = Vector2i(randi() % gridSizeX, randi() % (gridSizeY / 10) + (gridSizeY * 0.9))
 		points.push_front(point)
 		pointsDir.push_front(Vector2i(-1,0))
 	
