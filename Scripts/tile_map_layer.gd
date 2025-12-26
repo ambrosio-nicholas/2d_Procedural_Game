@@ -141,9 +141,16 @@ func generateHeightMap() -> void:
 			alt = (alt + 1.0) * 5
 			# Make Oceanic Plate tiles under sea level
 			if tectonicPlates[plateIndexArray[idx]].isOceanic == true: alt *= -1
-			# Make fault-lines mountainous
+			
 			if plateIndexArray[idx] == -1:
+				# Make fault-lines a shoreline
+				alt = 0
+			elif plateIndexArray[idx] == -2:
+				# Make fault-lines mountains
 				alt *= 3
+			elif plateIndexArray[idx] == -3:
+				# Make fault-line valleys?
+				pass
 			
 			heightMap[idx] = alt
 			altitudes[idx] = alt
@@ -156,27 +163,34 @@ func generateHeightMap() -> void:
 	var landAltitudes = altitudes.slice(seaIndex, (mapSizeX * mapSizeY))
 	var landCount = landAltitudes.size()
 	# figure out the rest of the altitude biomes
-	shoreLevel = -1
+	shoreLevel = 1
 	lowlandsLevel = landAltitudes[int(.50 * landCount)]
 	highlandsLevel = landAltitudes[int(.80 * landCount)]
 	mountainLevel = 9 #landAltitudes[int(.97 * landCount)]
 	peakLevel = landAltitudes[int(.99 * landCount)]
 
 func smoothTerrain(heightMap: Array) -> Array:
+	var kernel = [[1,  4,  6,  4, 1], [4, 16, 24, 16, 4], [6, 24, 36, 24, 6], [4, 16, 24, 16, 4], [1,  4,  6,  4, 1]]
 	var newMap = heightMap.duplicate()
+	
 	for x in range(mapSizeX):
 		for y in range(mapSizeY):
-			var sum = 0.0
-			var count = 0
-			for dx in [-1, 0, 1]:
-				for dy in [-1, 0, 1]:
+			var sum := 0.0
+			var weight_sum := 0.0
+			
+			for dx in range(-2, 3):
+				for dy in range(-2, 3):
 					var nx = x + dx
 					var ny = y + dy
+					
 					if nx < 0 or ny < 0 or nx >= mapSizeX or ny >= mapSizeY:
 						continue
-					sum += heightMap[ny * mapSizeX + nx]
-					count += 1
-			newMap[y * mapSizeX + x] = sum / count
+					
+					var weight = kernel[dy + 2][dx + 2]
+					sum += heightMap[ny * mapSizeX + nx] * weight
+					weight_sum += weight
+			
+			newMap[y * mapSizeX + x] = sum / weight_sum
 	return newMap
 
 func generateTectonicPoints() -> void:
@@ -253,14 +267,22 @@ func generateTectonics() -> void:
 					secondClosestDistance = d
 					secondClosestIndex = i
 			
-			# Assign the final plateIndexArray for that point
-			var edgeWidth = 500
+			# Assign the final plateIndexArray for that point ( -1 can be a shoreline , -2 can be a mountain range , -3 can be when the 2 plates are in the same direction)
+			var edgeWidth = 400
 			if (abs(secondClosestDistance - closestDistance) < edgeWidth):
-				# If it's an edge/fault line, assign it a value of -1
-				plateIndexArray[(y * mapSizeX) + x] = -1
+				if tectonicPlates[closestIndex].isOceanic == true || tectonicPlates[secondClosestIndex].isOceanic == true:
+					# This is a shoreline
+					plateIndexArray[(y * mapSizeX) + x] = -1
+				elif tectonicPlates[closestIndex].dirVector == tectonicPlates[secondClosestIndex].dirVector:
+					# These plates are moving in the same direction
+					plateIndexArray[(y * mapSizeX) + x] = -3
+				else:
+					# These must be mountainous fault lines
+					plateIndexArray[(y * mapSizeX) + x] = -2
 			else:
 				# These are all other tiles that aren't faultlines. They should just belong to their own tectonic plate
 				plateIndexArray[(y * mapSizeX) + x] = closestIndex
+			moistMap[(y * mapSizeX) + x] = tectonicPlates[closestIndex].moisture
 
 func generateRivers() -> void:
 	# Figure out how many rivers should be made for the map and how big the lakes should be able to get (These equations may need adjusting
@@ -378,10 +400,8 @@ func generateMoisture() -> void:
 			var noiseEffect = (moistureNoise.get_noise_2d(x,y) + 1) * .1
 			if heightMap[idx] <= seaLevel:
 				moistMap[idx] = 1
-			elif plateIndexArray[idx] == -2: # Shoreline
+			elif plateIndexArray[idx] == -1: # Shoreline
 				moistMap[idx] = 0 
-			else:
-				moistMap[idx] = tectonicPlates[plateIndexArray[idx]].moisture + noiseEffect
 
 func determineAndDrawTileType(x,y) -> void:
 	# Go through each tile and determine what type it should be. Start with getting all of it's info. (Could be used to set final data for the finished map when moving on to other parts of the game)
@@ -473,9 +493,9 @@ func drawDataMaps(x,y) -> void:
 	
 	# "Tectonic Plate" Map
 	if plateIndexArray[indx] == -1:
-		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(0,5))
-	elif plateIndexArray[indx] == -2:
 		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(5,5))
+	elif plateIndexArray[indx] == -2:
+		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(0,5))
 	elif plateIndexArray[indx] == 0:
 		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(1,0))
 	else:
