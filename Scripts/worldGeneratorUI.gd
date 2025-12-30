@@ -10,6 +10,7 @@ extends CanvasLayer
 @onready var seaVsLandSlider : HSlider = $SeaVsLandSlider
 @onready var seaVsLandText : Label = $SeaVsLandLabel
 @onready var newWorldButton : Button = $NewWorldButton
+@onready var moreInfoButton : Button = $MoreInfoButton
 @onready var tileInfoLabel : Label = $TileInfoLabel
 @onready var detailScaleLabel : Label = $DetailScaleLabel
 @onready var detailScaleSlider : HSlider = $DetailScaleSlider
@@ -70,9 +71,17 @@ func _process(delta: float) -> void:
 		worldGenerator.reseedWorld()
 		worldGenerator.generateWorld()
 	
+	if moreInfoButton.button_pressed:
+		worldGenerator.drawDataMaps()
+	
 	# Display the coords and altitude of the tile the player is currently over
 	playerCoords = Vector2i(roundi((player.position.x) / 32) % mapSizeX, roundi((player.position.y) / 32) % mapSizeY)
 	if worldGenerator.heightMap.size() == 0:
 		tileInfoLabel.text = "Tile: N/A | Altitude: N/A | Avg Humidity: N/A | Plate Index: N/A"
 	else:
-		tileInfoLabel.text = str("Tile: ", playerCoords, " | Altitude: ", worldGenerator.heightMap[((playerCoords.y * mapSizeX) + playerCoords.x) % (mapSizeX * mapSizeY)], " | Avg Humidity: ", worldGenerator.moistMap[((playerCoords.y * mapSizeX) + playerCoords.x)  % (mapSizeX * mapSizeY)], " | Plate Index: ", worldGenerator.plateIndexArray[((playerCoords.y * mapSizeX) + playerCoords.x)  % (mapSizeX * mapSizeY)])
+		var plateIndex = worldGenerator.plateIndexArray[((playerCoords.y * mapSizeX) + playerCoords.x)  % (mapSizeX * mapSizeY)]
+		tileInfoLabel.text = str("Tile: ", playerCoords,
+		" | Altitude: ", worldGenerator.heightMap[((playerCoords.y * mapSizeX) + playerCoords.x) % (mapSizeX * mapSizeY)],
+		" | Avg Humidity: ", worldGenerator.moistMap[((playerCoords.y * mapSizeX) + playerCoords.x)  % (mapSizeX * mapSizeY)],
+		" | Avg Altitude: ", worldGenerator.tectonicPlates[plateIndex].avgAlt,
+		" | Plate Index: ", plateIndex)

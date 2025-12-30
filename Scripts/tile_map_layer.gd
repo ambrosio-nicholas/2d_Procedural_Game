@@ -5,9 +5,10 @@ class tectonicPlate:
 	var pointCoords : Vector2i
 	var isOceanic : bool = 0 # 0 = Continental, 1 = Oceanic
 	var moisture : float = 0.3 # Average humidity level of the tectonic plate
+	var avgAlt : float = 4
 
-@export var mapSizeX : int = 400
-@export var mapSizeY : int = 400
+@export var mapSizeX : int = 500
+@export var mapSizeY : int = 500
 
 var heightMap : Array[float] = [] # Contains the altitude for each tile indexed in order
 var moistMap : Array[float] = [] # Contains the Average moisture for each tile
@@ -17,14 +18,15 @@ var tectonicPlates : Array[tectonicPlate] = [] # Contains the plates for the wor
 var riverTiles : Array[Vector2i] = [] # Contains all the river tiles we have
 
 #-----------------Terrain Parameters-----------------
-@export var plateFreq : float = 0.008
-@export var numOfPlates : int = 6
+@export var plateFreq : float = 0.01
+@export var numOfPlates : int = 24
+@export var numOfOceanPlates : int = 12
 
-@export var baseFreq : float = 0.002
+@export var baseFreq : float = 0.01
 @export var detailFreq: float = 0.003
 @export var moistFreq : float = 0.001
 
-@export var detailScale : float = 2.00 # This changes the distance between samples in the noise
+@export var detailScale : float = 1.25 # This changes the distance between samples in the noise
 
 @export var mountainHeight : float = 1 # Determines the altitude of mountain peaks. Useful when determining tiles
 @export var seaToLandRatio : float = 0.05 # Determines how much of the world should be water
@@ -73,6 +75,10 @@ func reseedWorld() -> void:
 
 # This function will generate the map
 func generateWorld() -> void:
+	# Erase all old tiles
+	for x in range(mapSizeX * 4):
+		for y in range(mapSizeY * 4):
+			set_cell(Vector2i(x,y))
 	# clear away any old world and prep for a new one
 	tile_map_data.clear()
 	riverTiles.clear()
@@ -95,8 +101,6 @@ func generateWorld() -> void:
 		for x in range(mapSizeX):
 			# for each square
 			determineAndDrawTileType(x,y)
-			# drawDataMaps gives seperate humidity, temp, and altitudes. Great for debugging!
-			drawDataMaps(x,y)
 	
 	# Draw the rivers
 	for i in range(riverTiles.size()):
@@ -139,6 +143,10 @@ func generateHeightMap() -> void:
 			var alt = (c * 0.05) + (b * 0.65) + (d * 0.3) # c may get removed as it's tied to plate tectonics
 			# Normalize to 0 through 10
 			alt = (alt + 1.0) * 5
+			
+			# Skew the altitude to lean towards the average of the continental plate
+			alt = (alt * 0.6) + (tectonicPlates[plateIndexArray[idx]].avgAlt * 0.4)
+			
 			# Make Oceanic Plate tiles under sea level
 			if tectonicPlates[plateIndexArray[idx]].isOceanic == true: alt *= -1
 			
@@ -196,7 +204,7 @@ func smoothTerrain(heightMap: Array) -> Array:
 func generateTectonicPoints() -> void:
 	# Generate tectonic plate points for vornoi diagram
 	tectonicPlates.clear()
-	for i in range(numOfPlates - 1):
+	for i in range(numOfPlates - numOfOceanPlates):
 		# Generate a new tectonic plate and choose its coords
 		tectonicPlates.push_front(tectonicPlate.new())
 		var coords = Vector2i(0,0)
@@ -227,18 +235,39 @@ func generateTectonicPoints() -> void:
 		elif rand == 3 || rand == 4: tectonicPlates[0].moisture = 0.51
 		elif rand == 5: tectonicPlates[0].moisture = 0.75
 		
+		# Assign an average/base altitude level to the plate (May want to switch thisw out from totally random later)
+		rand = (randi() % 7) + 1
+		tectonicPlates[0].avgAlt = rand
+		
 		# Make the plate continental
 		tectonicPlates[0].isOceanic = 0
 	
-	# Generate one tile that is garunteed to be oceanic along one of the edges
-	tectonicPlates.push_front(tectonicPlate.new())
-	tectonicPlates[0].isOceanic = 1
-	tectonicPlates[0].moisture = 1
-	var edge = randi() % 4
-	if edge == 0: tectonicPlates[0].pointCoords = Vector2i(randi() % (mapSizeX / 5), randi() % mapSizeY)
-	elif edge == 1: tectonicPlates[0].pointCoords = Vector2i(randi() % (mapSizeX / 5) + (mapSizeX * 0.8), randi() % mapSizeY)
-	elif edge == 2: tectonicPlates[0].pointCoords = Vector2i(randi() % mapSizeX, randi() % (mapSizeY / 5))
-	elif edge == 3: tectonicPlates[0].pointCoords = Vector2i(randi() % mapSizeX, randi() % (mapSizeY / 5) + (mapSizeY * 0.8))
+	# Generate x # of tiles that are garunteed to be oceanic along one of the edges
+	var edge = randi()
+	for i in range(numOfOceanPlates):
+		edge = (edge - 1) % 4
+		# Assign it coords that aren't too close to any other points
+		var pointCoords = Vector2i()
+		var attempts = 0
+		while attempts < 50:
+			attempts += 1
+			var distance = INF
+			var nearestDist = INF
+			if edge == 0: pointCoords = Vector2i(randi() % (mapSizeX / 5), randi() % mapSizeY)
+			elif edge == 1: pointCoords = Vector2i(randi() % (mapSizeX / 5) + (mapSizeX * 0.8), randi() % mapSizeY)
+			elif edge == 2: pointCoords = Vector2i(randi() % mapSizeX, randi() % (mapSizeY / 5))
+			elif edge == 3: pointCoords = Vector2i(randi() % mapSizeX, randi() % (mapSizeY / 5) + (mapSizeY * 0.8))
+			for j in range(tectonicPlates.size()):
+				distance = pointCoords.distance_to(tectonicPlates[j].pointCoords)
+				if distance < nearestDist:
+					nearestDist = distance
+			if nearestDist > 30:
+				break
+		tectonicPlates.push_front(tectonicPlate.new())
+		tectonicPlates[0].pointCoords = pointCoords
+		tectonicPlates[0].isOceanic = 1
+		tectonicPlates[0].moisture = 1
+		tectonicPlates[0].avgAlt = 0
 
 func generateTectonics() -> void:
 	# This function will create "tectonic plates" using a variation of a vornoi diagram. The points are generated in reseedWorld()
@@ -256,7 +285,7 @@ func generateTectonics() -> void:
 			var warpedY = y + plateNoise.get_noise_2d( x + 1000 , y + 1000 ) * 40
 			
 			# Go through each tectonic plate point and find which is the closest and which is the second closest (find their indexes)
-			for i in range(numOfPlates):
+			for i in range(tectonicPlates.size()):
 				var d = Vector2i(warpedX,warpedY).distance_squared_to(tectonicPlates[i].pointCoords)
 				if d < closestDistance:
 					secondClosestDistance = closestDistance
@@ -454,54 +483,56 @@ func determineAndDrawTileType(x,y) -> void:
 		# Peaks
 		set_cell(Vector2i(x,y),2,Vector2i(5,0))
 
-func drawDataMaps(x,y) -> void:
-	var indx = (y * mapSizeX) + x
-	# Moisture Map
-	if heightMap[indx] <= seaLevel:
-		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(0,0))
-	elif moistMap[indx] >= humidLevel:
-		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(3,4))
-	elif moistMap[indx] >= semiHumidLevel:
-		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(2,4))
-	elif moistMap[indx] >= semiDryLevel:
-		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(1,4))
-	elif moistMap[indx] >= dryLevel:
-		set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(0,4))
-	
-	# Altitude Map
-	if heightMap[indx] <= seaLevel:
-		# Ocean
-		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(0,0))
-	elif heightMap[indx] <= shoreLevel:
-		# Shore
-		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(0,5))
-	elif heightMap[indx] <= lowlandsLevel:
-		# Lowlands
-		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(1,5))
-	elif heightMap[indx] <= highlandsLevel:
-		# Highlands
-		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(2,5))
-	elif heightMap[indx] <= mountainLevel:
-		# Mountains
-		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(3,5))
-	elif heightMap[indx] <= peakLevel:
-		# High Mountains?
-		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(4,5))
-	else:
-		# Peaks
-		set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(5,5))
-	
-	# "Tectonic Plate" Map
-	if plateIndexArray[indx] == -1:
-		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(5,5))
-	elif plateIndexArray[indx] == -2:
-		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(0,5))
-	elif plateIndexArray[indx] == 0:
-		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(1,0))
-	else:
-		set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i((plateIndexArray[indx] % 4) + 1,5))
+func drawDataMaps() -> void:
+	for y in range(mapSizeY):
+		for x in range(mapSizeX):
+			var indx = (y * mapSizeX) + x
+			# Moisture Map
+			if heightMap[indx] <= seaLevel:
+				set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(0,0))
+			elif moistMap[indx] >= humidLevel:
+				set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(3,4))
+			elif moistMap[indx] >= semiHumidLevel:
+				set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(2,4))
+			elif moistMap[indx] >= semiDryLevel:
+				set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(1,4))
+			elif moistMap[indx] >= dryLevel:
+				set_cell(Vector2i(x, y + mapSizeY),2,Vector2i(0,4))
+			
+			# Altitude Map
+			if heightMap[indx] <= seaLevel:
+				# Ocean
+				set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(0,0))
+			elif heightMap[indx] <= shoreLevel:
+				# Shore
+				set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(0,5))
+			elif heightMap[indx] <= lowlandsLevel:
+				# Lowlands
+				set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(1,5))
+			elif heightMap[indx] <= highlandsLevel:
+				# Highlands
+				set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(2,5))
+			elif heightMap[indx] <= mountainLevel:
+				# Mountains
+				set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(3,5))
+			elif heightMap[indx] <= peakLevel:
+				# High Mountains?
+				set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(4,5))
+			else:
+				# Peaks
+				set_cell(Vector2i(x + mapSizeX, y),2,Vector2i(5,5))
+			
+			# "Tectonic Plate" Map
+			if plateIndexArray[indx] == -1:
+				set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(5,5))
+			elif plateIndexArray[indx] == -2:
+				set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(0,5))
+			elif tectonicPlates[plateIndexArray[indx]].isOceanic == true:
+				set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(1,0))
+			else:
+				set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i((plateIndexArray[indx] % 4) + 1,5))
 	drawDirectionArrows()
-	
+
 # This draws some direction arrows for the tectonic plate vectors
 func drawDirectionArrows() -> void:
 	for i in range(tectonicPlates.size()):
@@ -523,3 +554,5 @@ func drawDirectionArrows() -> void:
 			set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(5,5))
 			set_cell(Vector2i(x + 1 + mapSizeX, y + 1 + mapSizeY), 2, Vector2i(5,5))
 			set_cell(Vector2i(x - 1 + mapSizeX, y + 1 + mapSizeY), 2, Vector2i(5,5))
+		elif tectonicPlates[i].dirVector == Vector2i (0,0): # No Direction
+			set_cell(Vector2i(x + mapSizeX, y + mapSizeY), 2, Vector2i(5,5))
