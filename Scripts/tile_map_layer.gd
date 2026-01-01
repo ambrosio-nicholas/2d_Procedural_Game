@@ -31,9 +31,6 @@ var riverTiles : Array[Vector2i] = [] # Contains all the river tiles we have
 @export var mountainHeight : float = 1 # Determines the altitude of mountain peaks. Useful when determining tiles
 @export var seaToLandRatio : float = 0.05 # Determines how much of the world should be water
 
-var numOfRivers : int = 6
-var maxLakeSize : int = 600
-
 # Moisture Levels
 var dryLevel : float = -1.0
 var semiDryLevel : float = 0.20
@@ -92,7 +89,7 @@ func generateWorld() -> void:
 	# generate the base part of the world
 	generateHeightMap()
 	
-	#generateRivers()
+	generateRivers()
 	
 	generateMoisture()
 	
@@ -101,8 +98,6 @@ func generateWorld() -> void:
 		for x in range(mapSizeX):
 			# for each square
 			determineAndDrawTileType(x,y)
-	
-	# Draw the rivers
 	for i in range(riverTiles.size()):
 		set_cell(riverTiles[i],2,Vector2i(1,0))
 
@@ -207,13 +202,13 @@ func generateTectonicPoints() -> void:
 	for i in range(numOfPlates - numOfOceanPlates):
 		# Generate a new tectonic plate and choose its coords
 		tectonicPlates.push_front(tectonicPlate.new())
-		var coords = Vector2i(0,0)
+		var coords = Vector2i(-99,-99)
 		# Assign a random point that isn't too close to another point
 		while true:
 			var distance = INF
 			var nearestDist = INF
 			coords = Vector2i(randi() % mapSizeX , randi() % mapSizeY)
-			for j in range(i):
+			for j in range(tectonicPlates.size()):
 				distance = coords.distance_to(tectonicPlates[j].pointCoords)
 				if distance < nearestDist:
 					nearestDist = distance
@@ -247,7 +242,7 @@ func generateTectonicPoints() -> void:
 	for i in range(numOfOceanPlates):
 		edge = (edge - 1) % 4
 		# Assign it coords that aren't too close to any other points
-		var pointCoords = Vector2i()
+		var pointCoords = Vector2i(-99,-99)
 		var attempts = 0
 		while attempts < 50:
 			attempts += 1
@@ -314,110 +309,121 @@ func generateTectonics() -> void:
 			moistMap[(y * mapSizeX) + x] = tectonicPlates[closestIndex].moisture
 
 func generateRivers() -> void:
-	# Figure out how many rivers should be made for the map and how big the lakes should be able to get (These equations may need adjusting
-	numOfRivers = int(((mapSizeX * mapSizeY) / 12000) * (1-seaToLandRatio))
-	maxLakeSize = int(600 * (1/(seaToLandRatio + .7)))
-	var source = null
-	var nextTile = null
-	var lastTile = null
-	var lowestHeight = INF
-	var secondLowestHeight = INF
-	# For each river
-	for i in numOfRivers:
+	var numOfRivers = int((mapSizeX * mapSizeY) / 12000)
+	var maxLakeSize = 1000
+	
+	for i in range(numOfRivers):
 		var thisRiver = []
-		# Choose a valid point on the map (Criteria: Altitude)
-		for attempts in 500:
-			source = Vector2i(randi() % mapSizeX, randi() % mapSizeY)
-			if (heightMap[(source.y * mapSizeX) + source.x] > mountainLevel) && (heightMap[(source.y * mapSizeX) + source.x] < peakLevel):
-				break
-		lowestHeight = heightMap[(source.y * mapSizeX) + source.x]
-		lastTile = source
-		set_cell(source, 2, Vector2i(2,0))
+		var source : Vector2i
+		var lastTile : Vector2i
+		var nextTile : Vector2i
 		var poolSize = 0
-		# Now that we have a source, flow the river downhill until it hits water
-		while (lowestHeight > seaLevel) && (source.x > 0) && (source.x < mapSizeX - 1) && (source.y > 0) && (source.y < mapSizeY - 1):
-			var directions = [Vector2i( 0, -1),Vector2i( 0,  1),Vector2i( 1,  0),Vector2i(-1,  0),Vector2i(-1, -1),Vector2i( 1, -1),Vector2i(-1,  1),Vector2i( 1,  1)]
+		
+		# Pick source
+		for attempts in range(500):
+			source = Vector2i(randi() % mapSizeX, randi() % mapSizeY)
+			var h = heightMap[source.y * mapSizeX + source.x]
+			if h > mountainLevel and h < peakLevel:
+				break
+		lastTile = source
+		
+		var dirToRiverEnd = findRiverDirection(source)
+		if dirToRiverEnd == Vector2i.ZERO:
+			continue
+		
+		while true:
+			print("here1")
+			# Stop if the point is out of bound or on the edge of the map
+			if source.x <= 0 or source.x >= mapSizeX - 1:
+				break
+			print("here2")
+			if source.y <= 0 or source.y >= mapSizeY - 1:
+				break
+			print("here3")
+			var sourceHeight = heightMap[(source.y * mapSizeX) + source.x]
+			if sourceHeight <= seaLevel:
+				break
+			
+			var bestScore = INF
 			nextTile = source
-			# Check the surrounding tiles for a lower altitude
-			for dir in directions:
+			
+			# Check each tile around this one
+			var directions = [Vector2i( 0, -1), Vector2i( 0,  1), Vector2i( 1,  0), Vector2i(-1,  0), Vector2i(-1, -1), Vector2i( 1, -1), Vector2i(-1,  1), Vector2i( 1,  1)]
+			for j in range(directions.size()):
+				var dir = directions[j]
+				print("dirLoop")
 				var nx = source.x + dir.x
 				var ny = source.y + dir.y
-				if nx >= 0 && nx < mapSizeX && ny >= 0 && ny < mapSizeY:
-					var checkTile = Vector2i(nx, ny)
-					if checkTile != lastTile:
-						var heightIndex = (ny * mapSizeX) + nx
-						var heightValue = heightMap[heightIndex]
-						if heightValue < lowestHeight:
-							nextTile = checkTile
-							lowestHeight = heightValue
-						# Keep track of the second lowest altitude just in case
-						elif heightValue > lowestHeight && heightValue < secondLowestHeight:
-							secondLowestHeight = heightValue
+				
+				if nx < 0 or nx >= mapSizeX or ny < 0 or ny >= mapSizeY:
+					continue
+				
+				var checkTile = Vector2i(nx, ny)
+				if checkTile == lastTile:
+					continue
+				
+				var heightValue = heightMap[ny * mapSizeX + nx]
+				
+				# Direction bias toward endpoint
+				var direction : Vector2 = dir
+				var directionBias = -0.5 * direction.dot(dirToRiverEnd)
+				var score = heightValue + directionBias
+				
+				if score < bestScore:
+					bestScore = score
+					nextTile = checkTile
 			
-			# If we've reached a dead end, add some altitude and restart from the top of the loop
+			# Dead-end handling: erode terrain slightly
 			if nextTile == source:
-				heightMap[(source.y * mapSizeX) + source.x] = secondLowestHeight + .01
-				lowestHeight = INF
-				secondLowestHeight = INF
+				heightMap[source.y * mapSizeX + source.x] -= 1
 				poolSize += 1
+				
+				if poolSize > maxLakeSize:
+					print("POOLED")
+					break
+				
 				continue
-				
-			if poolSize > maxLakeSize: # If we end up in a big lake stop river
-				break
-				
-			# If we've hit water, stop making the river, we're done!
-			if (get_cell_atlas_coords(nextTile) == Vector2i(2,0)) && (thisRiver.find(nextTile, 0) == -1):
+			
+			# Stop if merging into another river
+			if riverTiles.has(nextTile):
+				print("MERGED")
 				break
 			
-			# Set variables before starting the loop again
+			# Advance river
 			lastTile = source
 			source = nextTile
-			lowestHeight = heightMap[(source.y * mapSizeX) + source.x]
-			secondLowestHeight = lowestHeight
-			
-			# Make the river tile actually water
 			riverTiles.push_front(source)
 			thisRiver.push_front(source)
-#	addRiverBanks()
 
-#func addRiverBanks() -> void:
-#	for y in range(mapSizeY):
-#		for x in range(mapSizeX):
-#			var tile = Vector2i(x, y)
-#			# Skip if tile is water
-#			if get_cell_atlas_coords(tile) == Vector2i(2,0):
-#				continue
-#				
-#			# Check neighbors
-#			var neighbors = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
-#			var adjacentToWater = false
-#			for dir in neighbors:
-#				var nx = x + dir.x
-#				var ny = y + dir.y
-#				if nx >= 0 && nx < mapSizeX and ny >= 0 && ny < mapSizeY:
-#					var neighborTile = Vector2i(nx, ny)
-#					if get_cell_atlas_coords(neighborTile) == Vector2i(2,0):
-#						adjacentToWater = true
-#						break
-#			
-#			if adjacentToWater:
-#				var idx = y * mapSizeX + x
-#				var currentHeight = heightMap[idx]
-#				# Color in the correct tile
-#				if currentHeight > highMountainLevel:
-#					set_cell(Vector2i(x,y),2,Vector2i(11,1))  # Peak Mountain Shoreline
-#				elif currentHeight > mediumMountainLevel:
-#					set_cell(Vector2i(x,y),2,Vector2i(10,1))  # High Mountain Shoreline
-#				elif currentHeight > lowMountainLevel:
-#					set_cell(Vector2i(x,y),2,Vector2i(9,1))  # Medium Mountain Shoreline
-#				elif currentHeight > foothillsLevel:
-#					set_cell(Vector2i(x,y),2,Vector2i(8,1)) # Low Mountains Shoreline
-#				elif currentHeight > forrestLevel:
-#					set_cell(Vector2i(x,y),2,Vector2i(7,1)) # Foothills Shoreline
-#				elif currentHeight > plainsLevel:
-#					set_cell(Vector2i(x,y),2,Vector2i(6,1)) # Forrest Shoreline
-#				elif currentHeight > shoreLevel:
-#					set_cell(Vector2i(x,y),2,Vector2i(5,1)) #Plains Shoreline
+func findRiverDirection(source : Vector2i) -> Vector2i:
+	if source.x == 0 || source.y == 0 || (source.x == mapSizeX - 1) || (source.y == mapSizeY - 1):
+		return Vector2i(0,0) 
+	# Search in 8 directions to find the nearest endpoint for a river: ocean, edge of map, other river. If there isn't a close point, no river!
+	var endPointDirection = Vector2i(0,0)
+	var closestDistance = INF
+	for dir in [Vector2i(0,1), Vector2i(1,1), Vector2i(1,0), Vector2i(1,-1), Vector2i(0,-1), Vector2i(-1,-1), Vector2i(-1,0), Vector2i(-1,1)]:
+		var currentDistance = 0
+		var potentialEndPoint = source
+		while true:
+			# Check in the direction until it hits a mountain, hits an ocean, or hits the edge of the map and find the distance to that!
+			potentialEndPoint += dir
+			currentDistance += 1
+			if (potentialEndPoint.x == mapSizeX - 1) || (potentialEndPoint.x == 0) || (potentialEndPoint.y == 0) || (potentialEndPoint.y == mapSizeY - 1):
+				break
+			#if heightMap[(potentialEndPoint.y * mapSizeX) + potentialEndPoint.x] >= mountainHeight:
+			#	break
+			if riverTiles.find(potentialEndPoint) != -1:
+				break
+			if heightMap[(potentialEndPoint.y * mapSizeX) + potentialEndPoint.x] <= seaLevel:
+				break
+		if currentDistance < closestDistance:
+			closestDistance = currentDistance
+			endPointDirection = dir
+	print(closestDistance)
+	if closestDistance == INF:
+		return Vector2i(0,0)
+	else:
+		return endPointDirection
 
 func generateMoisture() -> void:
 	moistureNoise.noise_type = FastNoiseLite.TYPE_SIMPLEX
@@ -426,7 +432,7 @@ func generateMoisture() -> void:
 	for y in range(mapSizeY):
 		for x in range(mapSizeX):
 			var idx = y * mapSizeX + x
-			var noiseEffect = (moistureNoise.get_noise_2d(x,y) + 1) * .1
+			#var noiseEffect = (moistureNoise.get_noise_2d(x,y) + 1) * .1
 			if heightMap[idx] <= seaLevel:
 				moistMap[idx] = 1
 			elif plateIndexArray[idx] == -1: # Shoreline
