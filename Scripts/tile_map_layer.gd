@@ -28,7 +28,6 @@ var riverTiles : Array[Vector2i] = [] # Contains all the river tiles we have
 
 @export var detailScale : float = 1.25 # This changes the distance between samples in the noise
 
-@export var mountainHeight : float = 1 # Determines the altitude of mountain peaks. Useful when determining tiles
 @export var seaToLandRatio : float = 0.05 # Determines how much of the world should be water
 
 # Moisture Levels
@@ -89,17 +88,17 @@ func generateWorld() -> void:
 	# generate the base part of the world
 	generateHeightMap()
 	
-	generateRivers()
-	
 	generateMoisture()
+	
+	generateRivers()
 	
 	# set the tiles to draw the world following all rules
 	for y in range(mapSizeY):
 		for x in range(mapSizeX):
 			# for each square
 			determineAndDrawTileType(x,y)
-	for i in range(riverTiles.size()):
-		set_cell(riverTiles[i],2,Vector2i(1,0))
+	#for i in range(riverTiles.size()):
+	#	set_cell(riverTiles[i],2,Vector2i(1,0))
 
 # This will generate the hieghtmap for the world
 func generateHeightMap() -> void:
@@ -309,121 +308,105 @@ func generateTectonics() -> void:
 			moistMap[(y * mapSizeX) + x] = tectonicPlates[closestIndex].moisture
 
 func generateRivers() -> void:
-	var numOfRivers = int((mapSizeX * mapSizeY) / 12000)
-	var maxLakeSize = 1000
-	
+	#var numOfRivers = int((mapSizeX * mapSizeY) / 12000) # Want to base this on number of shoreline tiles probably
+	var numOfRivers = 10
 	for i in range(numOfRivers):
 		var thisRiver = []
 		var source : Vector2i
 		var lastTile : Vector2i
 		var nextTile : Vector2i
-		var poolSize = 0
 		
-		# Pick source
-		for attempts in range(500):
+		# Pick a source that is on a shoreline/in the ocean
+		while true: #for attempts in range(500):
 			source = Vector2i(randi() % mapSizeX, randi() % mapSizeY)
 			var h = heightMap[source.y * mapSizeX + source.x]
-			if h > mountainLevel and h < peakLevel:
+			if plateIndexArray[(source.y * mapSizeX) + source.x] == -1 && h > seaLevel:
 				break
 		lastTile = source
+		thisRiver.push_front(source)
+		riverTiles.push_front(source)
+		moistMap[source.y * mapSizeX + source.x] = 1
 		
-		var dirToRiverEnd = findRiverDirection(source)
-		if dirToRiverEnd == Vector2i.ZERO:
-			continue
+		# Determine which direction is AWAY from the ocean, by finding the nearest oceanic plate and finding the vector between source and plate
+		var bestIdx = -1
+		var bestDist = INF
+		for t in range(tectonicPlates.size()):
+			if tectonicPlates[t].isOceanic == true:
+				var d = source.distance_squared_to(tectonicPlates[t].pointCoords)
+				if d < bestDist:
+					bestDist = d
+					bestIdx = t
+		# Find the vector between the ocean and the source. This will be used to influence the tile choice later on
+		var inlandDir = (Vector2(source) - Vector2(tectonicPlates[bestIdx].pointCoords)).normalized()
 		
-		while true:
-			print("here1")
+		var maxRiverAttempts = 250
+		for attempts in range(maxRiverAttempts):
 			# Stop if the point is out of bound or on the edge of the map
 			if source.x <= 0 or source.x >= mapSizeX - 1:
 				break
-			print("here2")
 			if source.y <= 0 or source.y >= mapSizeY - 1:
 				break
-			print("here3")
 			var sourceHeight = heightMap[(source.y * mapSizeX) + source.x]
-			if sourceHeight <= seaLevel:
-				break
 			
-			var bestScore = INF
+			var bestScore = 0
+			var isNextToRiver = false
 			nextTile = source
 			
 			# Check each tile around this one
 			var directions = [Vector2i( 0, -1), Vector2i( 0,  1), Vector2i( 1,  0), Vector2i(-1,  0), Vector2i(-1, -1), Vector2i( 1, -1), Vector2i(-1,  1), Vector2i( 1,  1)]
 			for j in range(directions.size()):
 				var dir = directions[j]
-				print("dirLoop")
 				var nx = source.x + dir.x
 				var ny = source.y + dir.y
-				
+				# If it's out of bounds, don't consider it
 				if nx < 0 or nx >= mapSizeX or ny < 0 or ny >= mapSizeY:
 					continue
 				
+				# If it's the one we just came from, don't consider it
 				var checkTile = Vector2i(nx, ny)
 				if checkTile == lastTile:
+					continue
+				
+				# Stop if next to another river
+				if riverTiles.has(nextTile) && !thisRiver.has(nextTile):
+					isNextToRiver = true
 					continue
 				
 				var heightValue = heightMap[ny * mapSizeX + nx]
 				
 				# Direction bias toward endpoint
-				var direction : Vector2 = dir
-				var directionBias = -0.5 * direction.dot(dirToRiverEnd)
-				var score = heightValue + directionBias
+				var direction = Vector2(dir)
+				var directionBias = 0.1 * direction.dot(inlandDir) # Get the dot product realtive to the inlandDirection (1 = Perfectly inland, 0 = perpindicular, -1 = towards the ocean)
+				var score = heightValue + directionBias                      # MAKE THIS SCORE TAKE INTO ACCOUNT THE inlandDir VECTOR AND MAYBE A DOT PRODUCT.
 				
-				if score < bestScore:
+				if score > bestScore: # Higher score = better tile
 					bestScore = score
 					nextTile = checkTile
 			
-			# Dead-end handling: erode terrain slightly
-			if nextTile == source:
-				heightMap[source.y * mapSizeX + source.x] -= 1
-				poolSize += 1
-				
-				if poolSize > maxLakeSize:
-					print("POOLED")
-					break
-				
-				continue
-			
-			# Stop if merging into another river
-			if riverTiles.has(nextTile):
-				print("MERGED")
+			# Stop if next to a river
+			if isNextToRiver == true:
 				break
+			# Dead-end handling: go inland
+			if nextTile == source:
+				break
+			# Stop if hitting a mountain
+			if heightMap[nextTile.y * mapSizeX + nextTile.x] >= mountainLevel:
+				break
+			# Make a lake if dead end
+			if attempts == 499:
+				# If the river got stuck
+				pass
 			
 			# Advance river
 			lastTile = source
 			source = nextTile
 			riverTiles.push_front(source)
 			thisRiver.push_front(source)
-
-func findRiverDirection(source : Vector2i) -> Vector2i:
-	if source.x == 0 || source.y == 0 || (source.x == mapSizeX - 1) || (source.y == mapSizeY - 1):
-		return Vector2i(0,0) 
-	# Search in 8 directions to find the nearest endpoint for a river: ocean, edge of map, other river. If there isn't a close point, no river!
-	var endPointDirection = Vector2i(0,0)
-	var closestDistance = INF
-	for dir in [Vector2i(0,1), Vector2i(1,1), Vector2i(1,0), Vector2i(1,-1), Vector2i(0,-1), Vector2i(-1,-1), Vector2i(-1,0), Vector2i(-1,1)]:
-		var currentDistance = 0
-		var potentialEndPoint = source
-		while true:
-			# Check in the direction until it hits a mountain, hits an ocean, or hits the edge of the map and find the distance to that!
-			potentialEndPoint += dir
-			currentDistance += 1
-			if (potentialEndPoint.x == mapSizeX - 1) || (potentialEndPoint.x == 0) || (potentialEndPoint.y == 0) || (potentialEndPoint.y == mapSizeY - 1):
-				break
-			#if heightMap[(potentialEndPoint.y * mapSizeX) + potentialEndPoint.x] >= mountainHeight:
-			#	break
-			if riverTiles.find(potentialEndPoint) != -1:
-				break
-			if heightMap[(potentialEndPoint.y * mapSizeX) + potentialEndPoint.x] <= seaLevel:
-				break
-		if currentDistance < closestDistance:
-			closestDistance = currentDistance
-			endPointDirection = dir
-	print(closestDistance)
-	if closestDistance == INF:
-		return Vector2i(0,0)
-	else:
-		return endPointDirection
+			moistMap[source.y * mapSizeX + source.x] = 1
+		
+		# The river should be a bit lower than the surrounding tiles
+		for j in range(thisRiver.size()):
+			heightMap[thisRiver[j].y * mapSizeX + thisRiver[j].x] *= 0.5
 
 func generateMoisture() -> void:
 	moistureNoise.noise_type = FastNoiseLite.TYPE_SIMPLEX
@@ -450,7 +433,6 @@ func determineAndDrawTileType(x,y) -> void:
 	elif alt <= shoreLevel:
 		# Shore
 		set_cell(Vector2i(x,y),2,Vector2i(2,0))
-		
 	elif alt <= lowlandsLevel: 
 		# Lowlands
 		if moisture <= semiDryLevel:
@@ -488,6 +470,9 @@ func determineAndDrawTileType(x,y) -> void:
 	else:
 		# Peaks
 		set_cell(Vector2i(x,y),2,Vector2i(5,0))
+	if riverTiles.has(Vector2i(x,y)):
+		# Rivers
+		set_cell(Vector2i(x,y),2,Vector2i(1,0))
 
 func drawDataMaps() -> void:
 	for y in range(mapSizeY):
